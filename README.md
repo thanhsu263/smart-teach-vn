@@ -115,6 +115,44 @@ Design notes:
   relies on `ON DELETE CASCADE` through assignments, and deleting a student first deletes that
   student's attempts in the same transaction.
 
+## Quizzes
+
+A quiz is one aggregate: quiz → questions → options / accepted answers. A teacher can have up to
+50 quizzes, each with up to 50 questions.
+
+| Kind | Rules |
+|---|---|
+| `single` | 2–6 options, exactly one correct |
+| `multi` | 2–6 options, at least one correct |
+| `true_false` | exactly 2 options, exactly one correct |
+| `short_text` | no options, 1–10 accepted answers; `ignoreDiacritics` makes "Ha Noi" match "Hà Nội" |
+
+Every question has a time limit of 10, 20, 30, 60 or 90 seconds (default 20). Option labels and
+accepted answers must be different from each other (ignoring case and surrounding spaces).
+
+| Endpoint | Description |
+|---|---|
+| `GET /api/quizzes?page=0&size=20` | My quizzes with question counts, last edited first |
+| `POST /api/quizzes` | Create a quiz with its questions |
+| `GET` / `PUT` / `DELETE /api/quizzes/{id}` | Read, replace, delete |
+| `POST /api/quizzes/{id}/duplicate` | Copy a quiz; the title gets the suffix `(bản sao)` |
+
+Design notes:
+
+- **Save = replace.** `PUT` sends the whole quiz. The service locks the quiz row, deletes its
+  questions in one statement (options and answers go with them by `ON DELETE CASCADE`) and
+  inserts the new list. This is simpler than diffing questions, and positions always stay
+  0, 1, 2… without gaps.
+- **No N+1.** Reading a quiz takes exactly 3 queries however many questions it has: the quiz,
+  questions with their options (`left join fetch`), then the accepted answers. Two collections
+  are not fetched in one query because that multiplies rows (and Hibernate rejects two bags).
+  An integration test counts the statements with Hibernate statistics.
+- **Validation in two layers.** Bean Validation checks field sizes; `QuizRules` checks the rules
+  per kind and returns every error with its path, e.g. `questions[1].options`, so the editor can
+  show it next to the right question.
+- **Deleting a quiz keeps assignments.** An assignment stores a JSON snapshot of the quiz when
+  it is published, so deleting the quiz only clears `assignments.quiz_id`.
+
 ## Tests
 
 ```bash
@@ -127,5 +165,8 @@ cover wrong password, expired and tampered tokens, refresh-token rotation and re
 validation errors and role-protected endpoints (401 / 403 / 200). Class tests cover the full
 CRUD flow, "another teacher gets 404" on every endpoint, one-time codes and stored hashes,
 validation, the 20-class / 100-student limits and cascading deletes with existing attempts.
+Quiz tests cover the rules of each question kind (unit tests), the save-replace order and limits
+(Mockito), and over HTTP: CRUD with all four kinds, duplicate, 404 for another teacher, error
+paths, the 3-query read and deleting a quiz that an assignment still points to.
 
 The JaCoCo report is written to `backend/target/site/jacoco/index.html`.

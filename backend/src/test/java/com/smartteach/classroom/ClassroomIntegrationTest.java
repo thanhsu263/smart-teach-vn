@@ -19,11 +19,7 @@ import java.util.List;
 import java.util.stream.IntStream;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.http.HttpHeaders;
-import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.test.web.servlet.ResultActions;
-import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
 
 class ClassroomIntegrationTest extends IntegrationTest {
 
@@ -219,14 +215,6 @@ class ClassroomIntegrationTest extends IntegrationTest {
     }
 
     // --- helpers ---
-
-    private ResultActions perform(String auth, MockHttpServletRequestBuilder request) throws Exception {
-        return mvc.perform(request.header(HttpHeaders.AUTHORIZATION, auth));
-    }
-
-    private ResultActions perform(String auth, MockHttpServletRequestBuilder request, String json) throws Exception {
-        return perform(auth, request.contentType(MediaType.APPLICATION_JSON).content(json));
-    }
 
     private long createClass(String auth, String name) throws Exception {
         String json = perform(auth, post("/api/classes"), "{\"name\":\"" + name + "\"}")

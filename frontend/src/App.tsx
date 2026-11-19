@@ -5,6 +5,8 @@ import { ClassesPage } from './classes/ClassesPage'
 import { AppLayout } from './components/AppLayout'
 import { LoginPage } from './pages/LoginPage'
 import { RegisterPage } from './pages/RegisterPage'
+import { QuizEditorPage } from './quizzes/QuizEditorPage'
+import { QuizzesPage } from './quizzes/QuizzesPage'
 
 const router = createBrowserRouter([
   {
@@ -23,6 +25,9 @@ const router = createBrowserRouter([
           { path: '/', element: <Navigate to="/classes" replace /> },
           { path: '/classes', element: <ClassesPage /> },
           { path: '/classes/:id', element: <ClassDetailPage /> },
+          { path: '/quizzes', element: <QuizzesPage /> },
+          { path: '/quizzes/new', element: <QuizEditorPage /> },
+          { path: '/quizzes/:id', element: <QuizEditorPage /> },
         ],
       },
     ],

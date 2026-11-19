@@ -52,3 +52,42 @@ export interface StudentCode {
   accessCode: string
   codeHint: string
 }
+
+export type QuestionKind = 'single' | 'true_false' | 'multi' | 'short_text'
+
+export interface QuizSummary {
+  id: number
+  title: string
+  questionCount: number
+  createdAt: string
+  updatedAt: string
+}
+
+export interface QuizOption {
+  label: string
+  correct: boolean
+}
+
+export interface Question {
+  position: number
+  kind: QuestionKind
+  prompt: string
+  timeLimitSeconds: number
+  ignoreDiacritics: boolean
+  options: QuizOption[]
+  acceptedAnswers: string[]
+}
+
+export interface Quiz {
+  id: number
+  title: string
+  createdAt: string
+  updatedAt: string
+  questions: Question[]
+}
+
+/** Body of POST/PUT /api/quizzes. Positions come from the array order. */
+export interface QuizPayload {
+  title: string
+  questions: Omit<Question, 'position'>[]
+}

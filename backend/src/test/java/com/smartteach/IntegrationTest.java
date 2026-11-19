@@ -9,9 +9,12 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.context.annotation.Import;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.ResultActions;
+import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
 
 /**
  * Base class for tests against the full app and a real SQL Server container. Every subclass
@@ -35,5 +38,13 @@ public abstract class IntegrationTest {
                 .andExpect(status().isCreated())
                 .andReturn().getResponse().getContentAsString();
         return "Bearer " + JsonPath.read(json, "$.accessToken");
+    }
+
+    protected ResultActions perform(String auth, MockHttpServletRequestBuilder request) throws Exception {
+        return mvc.perform(request.header(HttpHeaders.AUTHORIZATION, auth));
+    }
+
+    protected ResultActions perform(String auth, MockHttpServletRequestBuilder request, String json) throws Exception {
+        return perform(auth, request.contentType(MediaType.APPLICATION_JSON).content(json));
     }
 }
