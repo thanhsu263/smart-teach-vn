@@ -20,3 +20,35 @@ export interface ProblemDetail {
   detail?: string
   errors?: Record<string, string>
 }
+
+export interface Page<T> {
+  content: T[]
+  page: number
+  size: number
+  totalElements: number
+  totalPages: number
+}
+
+export interface ClassItem {
+  id: number
+  name: string
+  studentCount: number
+  createdAt: string
+}
+
+export interface Student {
+  id: number
+  name: string
+  position: number
+  codeHint: string
+  createdAt: string
+}
+
+/** Only returned right after a code is created; the plain code cannot be fetched again. */
+export interface StudentCode {
+  id: number
+  name: string
+  position: number
+  accessCode: string
+  codeHint: string
+}
