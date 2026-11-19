@@ -1,0 +1,4 @@
+app:
+  auth:
+    # Test-only key so CI does not need a JWT_SECRET variable.
+    jwt-secret: test-only-jwt-secret-not-used-anywhere-else-0123456789
