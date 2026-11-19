@@ -23,6 +23,9 @@ export function AppLayout() {
               <NavLink to="/quizzes" className={navClass}>
                 Quiz
               </NavLink>
+              <NavLink to="/assignments" className={navClass}>
+                Bài tập
+              </NavLink>
             </nav>
           </div>
           <div className="flex items-center gap-4 text-sm">
