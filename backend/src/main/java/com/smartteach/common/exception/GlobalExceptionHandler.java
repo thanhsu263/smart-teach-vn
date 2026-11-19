@@ -57,8 +57,17 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
         for (FieldError error : ex.getBindingResult().getFieldErrors()) {
             errors.putIfAbsent(error.getField(), error.getDefaultMessage());
         }
+        return ResponseEntity.badRequest().body(validationProblem(errors));
+    }
+
+    @ExceptionHandler(ValidationFailedException.class)
+    ResponseEntity<ProblemDetail> handleValidationFailed(ValidationFailedException ex) {
+        return ResponseEntity.badRequest().body(validationProblem(ex.getErrors()));
+    }
+
+    private static ProblemDetail validationProblem(Map<String, String> errors) {
         ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, "Validation failed");
         problem.setProperty("errors", errors);
-        return ResponseEntity.badRequest().body(problem);
+        return problem;
     }
 }
