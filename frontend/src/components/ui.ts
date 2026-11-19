@@ -11,3 +11,6 @@ export const input =
   'w-full rounded-lg border border-slate-300 px-3 py-2 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-200 aria-invalid:border-red-500'
 
 export const card = 'rounded-2xl bg-white p-5 shadow-sm ring-1 ring-slate-200'
+
+export const select =
+  'rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-200'

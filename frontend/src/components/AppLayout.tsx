@@ -2,6 +2,9 @@ import { Link, NavLink, Outlet } from 'react-router'
 import { useAuth } from '../auth/auth-context'
 import { button } from './ui'
 
+const navClass = ({ isActive }: { isActive: boolean }) =>
+  isActive ? 'font-semibold text-slate-900' : 'text-slate-600 hover:text-slate-900'
+
 export function AppLayout() {
   const { user, logout } = useAuth()
 
@@ -13,14 +16,12 @@ export function AppLayout() {
             <Link to="/" className="font-bold text-blue-600">
               SmartTeach
             </Link>
-            <nav className="text-sm">
-              <NavLink
-                to="/classes"
-                className={({ isActive }) =>
-                  isActive ? 'font-semibold text-slate-900' : 'text-slate-600 hover:text-slate-900'
-                }
-              >
+            <nav className="flex gap-4 text-sm">
+              <NavLink to="/classes" className={navClass}>
                 Lớp học
+              </NavLink>
+              <NavLink to="/quizzes" className={navClass}>
+                Quiz
               </NavLink>
             </nav>
           </div>
