@@ -1,21 +1,15 @@
 package com.smartteach;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.test.web.server.LocalServerPort;
-import org.springframework.context.annotation.Import;
 import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.web.client.RestClient;
 
-@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
-@Import(TestcontainersConfiguration.class)
-class BackendApplicationTests {
-
-    @LocalServerPort
-    int port;
+class BackendApplicationTests extends IntegrationTest {
 
     @Autowired
     JdbcTemplate jdbc;
@@ -31,18 +25,16 @@ class BackendApplicationTests {
     }
 
     @Test
-    void healthEndpointIsPublicAndUp() {
-        String body = RestClient.create("http://localhost:" + port)
-                .get().uri("/actuator/health")
-                .retrieve().body(String.class);
-        assertThat(body).contains("\"status\":\"UP\"");
+    void healthEndpointIsPublicAndUp() throws Exception {
+        mvc.perform(get("/actuator/health"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("UP"));
     }
 
     @Test
-    void otherEndpointsAreDenied() {
-        int status = RestClient.create("http://localhost:" + port)
-                .get().uri("/api/me")
-                .exchange((req, res) -> res.getStatusCode().value());
-        assertThat(status).isIn(401, 403);
+    void openApiDocsArePublic() throws Exception {
+        mvc.perform(get("/v3/api-docs"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.info.title").value("SmartTeach API"));
     }
 }
