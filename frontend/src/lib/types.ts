@@ -91,3 +91,102 @@ export interface QuizPayload {
   title: string
   questions: Omit<Question, 'position'>[]
 }
+
+export type AssignmentStatus = 'draft' | 'published' | 'closed'
+export type RevealPolicy = 'immediate' | 'after_close'
+export type AttemptStatus = 'in_progress' | 'submitted' | 'invalidated'
+
+export interface AssignmentSummary {
+  id: number
+  classId: number
+  className: string
+  title: string
+  publicCode: string
+  status: AssignmentStatus
+  opensAt: string | null
+  dueAt: string | null
+  createdAt: string
+}
+
+export interface Assignment {
+  id: number
+  classId: number
+  className: string | null
+  quizId: number | null
+  title: string
+  description: string
+  publicCode: string
+  opensAt: string | null
+  dueAt: string | null
+  revealPolicy: RevealPolicy
+  status: AssignmentStatus
+  /** Null until published: the questions are copied from the quiz at that moment. */
+  questionCount: number | null
+  createdAt: string
+  updatedAt: string
+  closedAt: string | null
+}
+
+export interface AssignmentPayload {
+  classId: number
+  quizId: number
+  title: string
+  description: string
+  opensAt: string | null
+  dueAt: string | null
+  revealPolicy: RevealPolicy
+}
+
+export interface Analytics {
+  studentCount: number
+  submittedCount: number
+  inProgressCount: number
+  averageScore: number | null
+  questions: { position: number; prompt: string; answered: number; correct: number; correctRate: number | null }[]
+  students: {
+    studentId: number
+    name: string
+    status: 'not_started' | AttemptStatus
+    score: number | null
+    correctCount: number | null
+    submittedAt: string | null
+  }[]
+}
+
+/** single/true_false: option index; multi: list of indexes; short_text: text. */
+export type AnswerValue = number | number[] | string
+
+export interface AttemptView {
+  attemptId: number
+  assignmentTitle: string
+  description: string
+  studentName: string
+  status: AttemptStatus
+  open: boolean
+  dueAt: string | null
+  revealPolicy: RevealPolicy
+  questions: { position: number; kind: QuestionKind; prompt: string; options: string[] }[]
+  answers: Record<string, AnswerValue>
+}
+
+export interface AttemptResult {
+  attemptId: number
+  assignmentTitle: string
+  studentName: string
+  status: AttemptStatus
+  submittedAt: string | null
+  /** False when the reveal policy hides the score until the assignment ends. */
+  revealed: boolean
+  score: number | null
+  correctCount: number | null
+  questionTotal: number | null
+  questions: {
+    position: number
+    kind: QuestionKind
+    prompt: string
+    options: QuizOption[]
+    acceptedAnswers: string[]
+    answer: AnswerValue | null
+    correct: boolean
+  }[]
+}

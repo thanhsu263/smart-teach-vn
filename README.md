@@ -153,6 +153,57 @@ Design notes:
 - **Deleting a quiz keeps assignments.** An assignment stores a JSON snapshot of the quiz when
   it is published, so deleting the quiz only clears `assignments.quiz_id`.
 
+## Assignments
+
+A teacher gives a quiz to a class as an assignment (up to 100 assignments per teacher). Its
+status goes `draft` → `published` → `closed`.
+
+| Endpoint | Description |
+|---|---|
+| `GET /api/assignments?classId=&page=0&size=20` | My assignments, optionally for one class |
+| `POST /api/assignments` | Create a draft: class, quiz, title, description, `opensAt`, `dueAt`, `revealPolicy` |
+| `GET` / `PUT` / `DELETE /api/assignments/{id}` | Read, edit, delete (attempts go with it) |
+| `POST /api/assignments/{id}/publish` | Freeze the quiz into a snapshot and open the assignment |
+| `POST /api/assignments/{id}/close` | Close early; students can no longer save or submit |
+| `GET /api/assignments/{id}/analytics` | Average score, correct rate per question, every student's status |
+
+Students use the public endpoints, without an account:
+
+| Endpoint | Description |
+|---|---|
+| `POST /api/public/assignments/{code}/start` | `{"accessCode": "..."}` → attempt token + questions (no answers) |
+| `GET /api/public/attempts/{id}` | The attempt with the answers saved so far |
+| `PUT /api/public/attempts/{id}/answers/{position}` | Save one answer (autosave) |
+| `POST /api/public/attempts/{id}/submit` | Grade on the server and return the result |
+| `GET /api/public/attempts/{id}/result` | Score and correct answers, when the reveal policy allows |
+
+Every `/attempts` call sends the token in the `X-Attempt-Token` header.
+
+Student flow in the UI: the teacher copies the link `/s/{code}` from the assignment page; the
+student opens it, types their personal access code, answers (each answer is saved as they go)
+and submits. With `revealPolicy = immediate` they see the score and correct answers right away;
+with `after_close` only after the due date or when the teacher closes the assignment.
+
+Design notes:
+
+- **Snapshot on publish.** Publishing copies the quiz into `assignments.quiz_snapshot` (JSON).
+  Editing or deleting the quiz later does not change an assignment students are already taking,
+  and grading always uses the snapshot. After publishing, class and quiz cannot be changed.
+- **One attempt per student.** A filtered unique index on `(assignment_id, student_id) WHERE
+  status = 'in_progress'` makes two parallel "start" requests unable to create two attempts.
+  Starting again (e.g. on another device) reuses the attempt with a new token.
+- **Attempt tokens** are random; only their SHA-256 hash is stored. A wrong assignment code,
+  student code, attempt id or token always gives the same **404**, so none can be probed.
+  When the teacher replaces a student's access code, the attempt in progress is invalidated.
+- **Grading on the server only.** Students never receive `isCorrect` or accepted answers before
+  submitting. `multi` needs exactly the correct set. `short_text` ignores case and extra spaces;
+  with `ignoreDiacritics` it also removes accents (`java.text.Normalizer` + `đ → d`). Score =
+  correct / total × 100, rounded to a whole number. Submitting twice returns the first result.
+- **Time rules.** `dueAt` must be after `opensAt`. Saving or submitting before `opensAt`, after
+  `dueAt` or after closing returns **409**.
+- **Retention.** `AttemptRetentionJob` runs every night at 03:00 UTC and deletes attempts (and
+  their answers) started more than 90 days ago. The cron can be changed with `app.retention.cron`.
+
 ## Tests
 
 ```bash
@@ -168,5 +219,10 @@ validation, the 20-class / 100-student limits and cascading deletes with existin
 Quiz tests cover the rules of each question kind (unit tests), the save-replace order and limits
 (Mockito), and over HTTP: CRUD with all four kinds, duplicate, 404 for another teacher, error
 paths, the 3-query read and deleting a quiz that an assignment still points to.
+Assignment tests cover grading for every kind (unit tests), the publish and schedule rules
+(Mockito), and over HTTP the full flow publish → start → autosave → submit → analytics, hidden
+answers before submitting, both reveal policies, 404 for wrong codes and tokens, invalidation
+after a new access code, and the 90-day retention job.
 
-The JaCoCo report is written to `backend/target/site/jacoco/index.html`.
+The JaCoCo report is written to `backend/target/site/jacoco/index.html`. `mvn verify` fails if
+line coverage of any `service` package drops below 70%.

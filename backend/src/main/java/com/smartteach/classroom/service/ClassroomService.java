@@ -74,7 +74,7 @@ public class ClassroomService {
                 .orElseThrow(ClassroomService::classNotFound);
     }
 
-    static ApiException classNotFound() {
+    public static ApiException classNotFound() {
         return ApiException.notFound("Class not found");
     }
 }

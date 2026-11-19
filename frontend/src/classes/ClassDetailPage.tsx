@@ -121,6 +121,9 @@ function ClassHeader({ classroom }: { classroom: ClassItem }) {
     <div className="flex flex-wrap items-center justify-between gap-3">
       <h1 className="text-2xl font-bold text-slate-900">{classroom.name}</h1>
       <div className="flex gap-2">
+        <Link to={`/assignments?classId=${classroom.id}`} className={button.secondary}>
+          Bài tập của lớp
+        </Link>
         <button type="button" className={button.secondary} onClick={() => setEditing(true)}>
           Đổi tên
         </button>

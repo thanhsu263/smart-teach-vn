@@ -84,11 +84,15 @@ public class StudentService {
         studentRepository.delete(student);
     }
 
-    /** Replaces the code (e.g. a student forgot it). The old code stops working immediately. */
+    /**
+     * Replaces the code (e.g. a student forgot it or someone else saw it). The old code and every
+     * attempt token issued with it stop working immediately.
+     */
     @Transactional
     public StudentCodeResponse regenerateCode(Long ownerId, Long studentId) {
         Student student = findOwned(ownerId, studentId);
         String code = assignNewCode(student);
+        studentRepository.revokeAttemptsOf(studentId);
         return mapper.toCodeResponse(student, code);
     }
 

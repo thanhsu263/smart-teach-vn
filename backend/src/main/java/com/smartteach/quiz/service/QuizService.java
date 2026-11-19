@@ -55,6 +55,11 @@ public class QuizService {
         return mapper.toResponse(quiz, loadQuestions(quizId));
     }
 
+    /** For other modules that reference a quiz (assignments): 404 unless the teacher owns it. */
+    public void requireOwned(Long ownerId, Long quizId) {
+        findOwned(ownerId, quizId);
+    }
+
     @Transactional
     public QuizResponse create(Long ownerId, QuizRequest request) {
         checkRules(request);
