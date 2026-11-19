@@ -84,6 +84,37 @@ How it works:
 - **Errors:** every error is an RFC 9457 `ProblemDetail`; validation errors include an
   `errors` map (field → message).
 
+## Classes and students
+
+A teacher can have up to 20 classes and each class up to 100 students. Students have no
+account: each one gets a personal **access code** (10 characters, e.g. `858PXU7TJ3`) that they
+will use to open assignments.
+
+| Endpoint | Description |
+|---|---|
+| `GET /api/classes?page=0&size=20` | My classes with student counts, newest first (max page size 100) |
+| `POST /api/classes` | Create a class |
+| `GET` / `PUT` / `DELETE /api/classes/{id}` | Read, rename, delete (students, assignments and results go with it) |
+| `GET /api/classes/{id}/students` | Students in order, with the code hint only |
+| `POST /api/classes/{id}/students` | Add many students at once: `{"names": ["An", "Bình"]}` → their codes |
+| `PUT` / `DELETE /api/students/{id}` | Rename or remove a student |
+| `POST /api/students/{id}/access-code` | Replace a student's code (the old one stops working) |
+
+Design notes:
+
+- **Ownership:** there is no row-level security in SQL Server here, so every query filters by
+  `owner_id = current user`. Another teacher's class or student returns **404**, not 403, so
+  ids of other teachers' data cannot be probed.
+- **Access codes are shown once.** Only a SHA-256 hash and the last 4 characters (`code_hint`)
+  are stored. SHA-256 instead of BCrypt because a code must be found by its hash in one
+  indexed lookup; this is safe because codes are random (about 49 bits from an alphabet without
+  look-alike characters such as `0/O`, `1/I/L`), not passwords chosen by people.
+- **Bulk add** locks the class row (`PESSIMISTIC_WRITE`), so the 100-student limit and the
+  positions stay correct when two requests arrive together.
+- **Deletes:** SQL Server does not allow two cascade paths to `attempts`, so deleting a class
+  relies on `ON DELETE CASCADE` through assignments, and deleting a student first deletes that
+  student's attempts in the same transaction.
+
 ## Tests
 
 ```bash
@@ -93,6 +124,8 @@ cd frontend && npm run lint && npm run build
 
 Integration tests start one SQL Server container and share a single Spring context. Auth tests
 cover wrong password, expired and tampered tokens, refresh-token rotation and reuse, logout,
-validation errors and role-protected endpoints (401 / 403 / 200).
+validation errors and role-protected endpoints (401 / 403 / 200). Class tests cover the full
+CRUD flow, "another teacher gets 404" on every endpoint, one-time codes and stored hashes,
+validation, the 20-class / 100-student limits and cascading deletes with existing attempts.
 
 The JaCoCo report is written to `backend/target/site/jacoco/index.html`.
