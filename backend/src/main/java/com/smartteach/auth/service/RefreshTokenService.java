@@ -4,15 +4,12 @@ import com.smartteach.auth.config.AuthProperties;
 import com.smartteach.auth.entity.RefreshToken;
 import com.smartteach.auth.repository.RefreshTokenRepository;
 import com.smartteach.common.exception.ApiException;
+import com.smartteach.common.security.Hashing;
 import com.smartteach.user.entity.User;
-import java.nio.charset.StandardCharsets;
-import java.security.MessageDigest;
-import java.security.NoSuchAlgorithmException;
 import java.security.SecureRandom;
 import java.time.Clock;
 import java.time.Instant;
 import java.util.Base64;
-import java.util.HexFormat;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -89,12 +86,7 @@ public class RefreshTokenService {
     }
 
     static String hash(String raw) {
-        try {
-            byte[] digest = MessageDigest.getInstance("SHA-256").digest(raw.getBytes(StandardCharsets.UTF_8));
-            return HexFormat.of().formatHex(digest);
-        } catch (NoSuchAlgorithmException e) {
-            throw new IllegalStateException("SHA-256 not available", e);
-        }
+        return Hashing.sha256Hex(raw);
     }
 
     private static ApiException invalid() {
