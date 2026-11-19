@@ -1,0 +1,40 @@
+spring:
+  application:
+    name: smartteach
+  config:
+    # Local dev: read the repo-root .env (works from backend/ or the repo root).
+    # In Docker / cloud the same keys come from real environment variables.
+    import:
+      - optional:file:.env[.properties]
+      - optional:file:../.env[.properties]
+  datasource:
+    url: ${DB_URL:jdbc:sqlserver://localhost:${DB_PORT:14333};databaseName=smartteach;encrypt=true;trustServerCertificate=true}
+    username: ${DB_USERNAME:sa}
+    password: ${DB_PASSWORD:}
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: validate
+    properties:
+      hibernate:
+        jdbc:
+          time_zone: UTC
+        # Columns are NVARCHAR / DATETIME2; tell Hibernate so schema validation matches.
+        use_nationalized_character_data: true
+        type:
+          preferred_instant_jdbc_type: TIMESTAMP
+  flyway:
+    locations: classpath:db/migration
+
+server:
+  port: ${SERVER_PORT:8080}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health
+  endpoint:
+    health:
+      probes:
+        enabled: true
