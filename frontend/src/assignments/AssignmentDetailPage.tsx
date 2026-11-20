@@ -79,7 +79,7 @@ function Header({ assignment: a }: { assignment: Assignment }) {
             </span>
           </div>
           <p className="text-sm text-slate-500">
-            Lớp {a.className}
+            {a.className}
             {a.questionCount !== null && ` · ${a.questionCount} câu hỏi`} · Mở {formatDate(a.opensAt, 'ngay')} · Hạn{' '}
             {formatDate(a.dueAt, 'không giới hạn')}
           </p>

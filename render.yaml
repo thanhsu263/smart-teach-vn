@@ -1,0 +1,45 @@
+# Render Blueprint for the backend (Dashboard → New → Blueprint → pick this repo).
+# Values marked "sync: false" are secrets: Render asks for them when the Blueprint is created,
+# they are never stored in this file.
+services:
+  - type: web
+    name: smartteach-api
+    runtime: docker
+    plan: free
+    # Same region as the Azure SQL database (Southeast Asia) to keep queries fast.
+    region: singapore
+    dockerContext: ./backend
+    dockerfilePath: ./backend/Dockerfile
+    # Liveness does not touch the database, so a sleeping Azure SQL database does not
+    # make Render restart the service.
+    healthCheckPath: /actuator/health/liveness
+    buildFilter:
+      paths:
+        - backend/**
+    envVars:
+      - key: SPRING_PROFILES_ACTIVE
+        value: demo
+      # jdbc:sqlserver://<server>.database.windows.net:1433;databaseName=smartteach;encrypt=true;trustServerCertificate=false;hostNameInCertificate=*.database.windows.net;loginTimeout=60
+      - key: DB_URL
+        sync: false
+      - key: DB_USERNAME
+        sync: false
+      - key: DB_PASSWORD
+        sync: false
+      - key: JWT_SECRET
+        generateValue: true
+      # The Vercel URL of the frontend, e.g. https://smart-teach-vn.vercel.app
+      - key: CORS_ALLOWED_ORIGINS
+        sync: false
+      # Browsers reach the API through Vercel's /api rewrite (same site), so Lax is enough.
+      - key: AUTH_COOKIE_SECURE
+        value: "true"
+      - key: AUTH_COOKIE_SAME_SITE
+        value: Lax
+      # A paused free Azure SQL database needs up to a minute to wake up: keep retrying at startup.
+      - key: SPRING_FLYWAY_CONNECTRETRIES
+        value: "10"
+      - key: DEMO_EMAIL
+        value: demo@smartteach.vn
+      - key: DEMO_PASSWORD
+        sync: false

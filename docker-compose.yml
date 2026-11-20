@@ -37,5 +37,25 @@ services:
         -Q "IF DB_ID('smartteach') IS NULL CREATE DATABASE smartteach COLLATE Vietnamese_100_CI_AS"
     restart: "no"
 
+  # Backend in a container, with demo data. Started only with: docker compose --profile app up -d --build
+  # (plain `docker compose up -d` still starts just the database, for running the backend from the IDE).
+  backend:
+    profiles: [app]
+    build: ./backend
+    depends_on:
+      db-init:
+        condition: service_completed_successfully
+    environment:
+      DB_URL: jdbc:sqlserver://db:1433;databaseName=smartteach;encrypt=true;trustServerCertificate=true
+      DB_USERNAME: sa
+      DB_PASSWORD: ${MSSQL_SA_PASSWORD}
+      JWT_SECRET: ${JWT_SECRET:-}
+      CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-http://localhost:5173}
+      SPRING_PROFILES_ACTIVE: demo
+      DEMO_EMAIL: ${DEMO_EMAIL:-demo@smartteach.vn}
+      DEMO_PASSWORD: ${DEMO_PASSWORD:-}
+    ports:
+      - "127.0.0.1:${SERVER_PORT:-8080}:8080"
+
 volumes:
   mssql-data:
