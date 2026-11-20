@@ -6,7 +6,8 @@ SmartTeach helps Vietnamese high-school teachers manage classes, build quizzes a
 to a class as assignments. Students do not need an account: each one gets a personal access
 code, opens the link the teacher shares, answers (autosaved) and gets graded on the server.
 The teacher sees the average score, the correct rate of every question and who has not
-started yet.
+started yet. In class, the teacher can also run a quiz as a **live game**: students join with a
+6-digit PIN and a nickname, and answers and rankings update on every screen in real time.
 
 It is a portfolio project for a Java backend internship: a Spring Boot REST API with JWT
 auth, SQL Server + Flyway, integration tests on a real database (Testcontainers) and a React
@@ -34,6 +35,14 @@ data is recreated every time the backend starts, so feel free to change anything
 |---|---|
 | ![Student attempt](docs/screenshots/student-attempt.png) | ![Student result](docs/screenshots/student-result.png) |
 
+| Live quiz: lobby (teacher) | Live quiz: answers revealed (teacher) |
+|---|---|
+| ![Live lobby](docs/screenshots/live-host-lobby.png) | ![Live reveal](docs/screenshots/live-host-reveal.png) |
+
+| Live quiz: student answering | Live quiz: student after the reveal |
+|---|---|
+| ![Live player question](docs/screenshots/live-player-question.png) | ![Live player reveal](docs/screenshots/live-player-reveal.png) |
+
 ## Features
 
 - **Auth:** register / login, 15-minute JWT access token, rotating refresh token in an
@@ -44,16 +53,18 @@ data is recreated every time the backend starts, so feel free to change anything
 - **Assignments:** publish freezes a snapshot of the quiz, students take it with their code,
   answers autosave, grading happens on the server, results are revealed immediately or after
   closing, per-question analytics.
+- **Live quiz:** the teacher projects a game, students join from their phones with a PIN and a
+  nickname, points depend on correctness and speed; state is pushed over WebSocket (STOMP).
 - **Data retention:** a nightly job deletes student attempts older than 90 days.
 
 ## Tech stack
 
 - **Backend:** Java 26, Spring Boot 4.1 (Web MVC, Security, OAuth2 Resource Server for JWT,
-  Data JPA, Validation, Actuator), Flyway, MapStruct, Lombok, springdoc-openapi
+  Data JPA, Validation, Actuator, WebSocket + STOMP), Flyway, MapStruct, Lombok, springdoc-openapi
 - **Database:** Microsoft SQL Server 2022 (Azure SQL in production)
 - **Tests:** JUnit 5, Mockito, Testcontainers (real SQL Server), JaCoCo
 - **Frontend:** React + Vite + TypeScript, React Router, TanStack Query, Tailwind CSS,
-  react-hook-form + zod, axios
+  react-hook-form + zod, axios, @stomp/stompjs
 - **CI / deploy:** GitHub Actions, Docker, Render (backend), Vercel (frontend)
 
 ## Architecture
@@ -63,14 +74,16 @@ flowchart LR
     B[Browser] -->|pages| V[Vercel<br/>React build]
     B -->|/api/*| V
     V -->|rewrite /api/*| R[Render<br/>Spring Boot in Docker]
+    B -.->|WebSocket /ws<br/>live quiz only| R
     R -->|JDBC + Flyway| S[(Azure SQL)]
 ```
 
 Vercel serves the frontend and forwards `/api/*` to the backend, so the browser talks to one
 site. The refresh cookie is then a first-party cookie and works with `SameSite=Lax`, even in
-browsers that block third-party cookies.
+browsers that block third-party cookies. Vercel rewrites cannot carry WebSockets, so the live
+quiz connects to the backend's `/ws` directly (`VITE_WS_URL`); that needs no cookie.
 
-The backend is split by feature (`auth`, `user`, `classroom`, `quiz`, `assignment`, `common`),
+The backend is split by feature (`auth`, `user`, `classroom`, `quiz`, `assignment`, `live`, `common`),
 each with `controller / service / repository / entity / dto / mapper`. The database schema and
 its rules are described in [docs/erd.md](docs/erd.md).
 
@@ -116,7 +129,8 @@ Register a new teacher in the UI, or run the backend with demo data:
 
 The backend reads `../.env` automatically, so no extra environment setup is needed when
 running from `backend/`. In dev the Vite server proxies `/api` to the backend port from
-`.env` (`SERVER_PORT`), so the browser only talks to one origin.
+`.env` (`SERVER_PORT`), and `/ws` the same way for the live quiz, so the browser only talks to
+one origin.
 
 API docs (Swagger UI): http://localhost:8080/swagger-ui.html
 
@@ -136,6 +150,7 @@ API docs (Swagger UI): http://localhost:8080/swagger-ui.html
 | `SPRING_PROFILES_ACTIVE` | backend | `demo` recreates the demo teacher and their data on every start |
 | `DEMO_EMAIL`, `DEMO_PASSWORD` | backend (demo profile) | Demo teacher account; the password must have at least 8 characters |
 | `VITE_API_URL` | frontend build | Backend origin; leave empty when `/api` is proxied (dev server, Vercel) |
+| `VITE_WS_URL` | frontend build | Live quiz WebSocket, e.g. `wss://<backend>/ws`; leave empty in dev (Vite proxies `/ws`) |
 
 ## Deploy
 
@@ -153,7 +168,8 @@ The repository contains the configuration for a free deployment:
 - **Frontend – Vercel** with root directory `frontend`.
   [`frontend/vercel.json`](frontend/vercel.json) rewrites `/api/*` to the Render URL and every
   other path to `index.html` (client-side routing). Set `CORS_ALLOWED_ORIGINS` on Render to
-  the Vercel URL.
+  the Vercel URL, and `VITE_WS_URL=wss://<render host>/ws` on Vercel for the live quiz (the
+  WebSocket handshake is checked against the same allowed origins).
 
 ## Authentication
 
@@ -306,6 +322,62 @@ Design notes:
 - **Retention.** `AttemptRetentionJob` runs every night at 03:00 UTC and deletes attempts (and
   their answers) started more than 90 days ago. The cron can be changed with `app.retention.cron`.
 
+## Live quiz
+
+The teacher starts a game from a quiz ("Chơi trực tiếp") and projects `/live/{pin}`. Students
+open `/play`, type the PIN and a nickname, and play on their phones. A game goes
+`lobby` → `question` → `reveal` → … → `ended`.
+
+Teacher endpoints (signed in):
+
+| Endpoint | Description |
+|---|---|
+| `POST /api/live` | `{"quizId": 1}` → a new room with a 6-digit PIN (ends the teacher's previous game) |
+| `GET /api/live/{pin}` | Room state |
+| `POST /api/live/{pin}/next` | Start → reveal the answer → next question → … → final ranking |
+| `POST /api/live/{pin}/end` | End now |
+| `DELETE /api/live/{pin}/players/{playerId}` | Remove a player (their nickname stays taken) |
+
+Player endpoints (no account; after joining, send `X-Player-Token`):
+
+| Endpoint | Description |
+|---|---|
+| `GET /api/public/live/{pin}` | Room state, without the correct answer while a question is open |
+| `POST /api/public/live/{pin}/players` | `{"nickname": "An"}` → player id + token (only in the lobby) |
+| `GET /api/public/live/{pin}/me` | My score and whether I answered the current question (after a reload) |
+| `POST /api/public/live/{pin}/answers` | `{"position": 0, "answer": 1}`, one answer per question |
+
+Clients subscribe to `/topic/live/{pin}` on the STOMP endpoint `/ws` and receive the full room
+state after every change.
+
+Design notes:
+
+- **In memory, not in the database.** A game lasts a few minutes and needs no history, so rooms
+  live in a `ConcurrentHashMap` keyed by PIN, and every room method is `synchronized` (one lock
+  per room, games do not block each other). Ended rooms are kept 15 minutes for the final
+  ranking, idle rooms 3 hours, then a scheduled job drops them. The limit is one backend
+  instance: running several would need a shared store (e.g. Redis) and an external STOMP broker.
+- **REST for commands, WebSocket only for pushes.** Joining and answering are normal HTTP
+  requests with validation, `ProblemDetail` errors and the same security as the rest of the
+  API. The broker only sends: an interceptor rejects every `SEND` frame and any subscription
+  other than `/topic/live/{6 digits}`.
+- **Full state + version.** Each push is the whole state with an increasing `version`, so a
+  client never applies an older state that arrives late, and after a reconnect it simply loads
+  the state again over REST.
+- **Server-side time.** The server records when a question opened and when each answer
+  arrived, and closes the question with a timer at `endsAt` (or as soon as every player has
+  answered). Clients only show a countdown, corrected by the server's clock (`serverTime`).
+- **Scoring.** A right answer gives 500–1000 points: `1000 × (1 − 0.5 × responseTime / timeLimit)`,
+  so a correct answer is always worth at least half; a wrong or missing answer gives 0.
+  Grading reuses the assignment rules (`multi` needs the exact set, `short_text` can ignore
+  accents). Equal scores share a rank (1, 1, 3).
+- **Nicknames** are trimmed, 1–20 characters without control characters, unique in the room
+  ignoring case; a room holds up to 50 players. Player tokens are random and only their
+  SHA-256 hash is kept.
+- **Hidden answers.** While a question is open, the state contains only the prompt and the
+  option labels; the correct options, accepted answers and per-option counts appear in the
+  reveal phase.
+
 ## Tests
 
 ```bash
@@ -326,6 +398,10 @@ Assignment tests cover grading for every kind (unit tests), the publish and sche
 answers before submitting, both reveal policies, 404 for wrong codes and tokens, invalidation
 after a new access code, and the 90-day retention job. A demo-data test checks that the seed
 builds the expected classes, quizzes and results and can run twice.
+Live quiz tests cover the room rules as unit tests (scoring, nickname rules, limits, auto-reveal,
+stale timers, late and duplicate answers, ties, expiry) and, with the server on a random port,
+a full game over HTTP, "another teacher gets 404", and a real STOMP client that receives the
+pushed states and is refused when it tries to send or subscribe to another topic.
 
 The JaCoCo report is written to `backend/target/site/jacoco/index.html`. `mvn verify` fails if
 line coverage of any `service` package drops below 70%.
