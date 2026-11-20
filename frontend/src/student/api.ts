@@ -5,7 +5,7 @@ import type { AnswerValue, AttemptResult, AttemptView } from '../lib/types'
  * Separate client without the teacher interceptors: student calls must never carry a teacher's
  * Bearer token or trigger a session refresh when a teacher is logged in on the same browser.
  */
-const publicApi = axios.create({ baseURL: import.meta.env.VITE_API_URL ?? '' })
+export const publicApi = axios.create({ baseURL: import.meta.env.VITE_API_URL ?? '' })
 
 // sessionStorage: on a shared school computer the token disappears with the tab. The student
 // can always continue by entering the codes again (the backend reuses the attempt).

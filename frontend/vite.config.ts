@@ -18,6 +18,12 @@ export default defineConfig(({ mode }) => {
           target: backend,
           configure: (proxy) => proxy.on('proxyReq', (proxyReq) => proxyReq.removeHeader('origin')),
         },
+        // Live quiz WebSocket (STOMP).
+        '/ws': {
+          target: backend,
+          ws: true,
+          configure: (proxy) => proxy.on('proxyReqWs', (proxyReq) => proxyReq.removeHeader('origin')),
+        },
       },
     },
   }

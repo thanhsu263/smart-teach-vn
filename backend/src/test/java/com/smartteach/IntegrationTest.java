@@ -20,7 +20,8 @@ import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilde
  * Base class for tests against the full app and a real SQL Server container. Every subclass
  * uses the same configuration, so Spring reuses one context and one container for all of them.
  */
-@SpringBootTest
+// A real port so the live quiz tests can also connect over WebSocket.
+@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 @AutoConfigureMockMvc
 @ActiveProfiles("test")
 @Import(TestcontainersConfiguration.class)
