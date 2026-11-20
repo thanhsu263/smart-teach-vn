@@ -1,10 +1,11 @@
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
-import { Link } from 'react-router'
+import { Link, useNavigate } from 'react-router'
 import { FormError } from '../components/form'
 import { button, card } from '../components/ui'
 import { problemOf } from '../lib/api'
 import type { QuizSummary } from '../lib/types'
+import { hostApi } from '../live/api'
 import { quizApi, quizKeys } from './api'
 import { MAX_QUIZZES } from './schemas'
 
@@ -85,6 +86,11 @@ function QuizRow({ quiz, onCopied }: { quiz: QuizSummary; onCopied: () => void }
     },
   })
   const remove = useMutation({ mutationFn: () => quizApi.remove(quiz.id), onSuccess: refresh })
+  const navigate = useNavigate()
+  const play = useMutation({
+    mutationFn: () => hostApi.create(quiz.id),
+    onSuccess: (room) => navigate(`/live/${room.pin}`),
+  })
 
   const error = duplicate.error
     ? problemOf(duplicate.error)?.status === 409
@@ -92,7 +98,9 @@ function QuizRow({ quiz, onCopied }: { quiz: QuizSummary; onCopied: () => void }
       : 'Không nhân bản được quiz.'
     : remove.error
       ? 'Không xoá được quiz.'
-      : undefined
+      : play.error
+        ? 'Không mở được phòng chơi, hãy thử lại.'
+        : undefined
 
   return (
     <li className={`${card} space-y-2`}>
@@ -104,6 +112,15 @@ function QuizRow({ quiz, onCopied }: { quiz: QuizSummary; onCopied: () => void }
           </p>
         </Link>
         <div className="flex gap-2">
+          <button
+            type="button"
+            className={button.primary}
+            disabled={play.isPending || quiz.questionCount === 0}
+            title="Mở phòng có mã PIN, học sinh vào chơi trên điện thoại"
+            onClick={() => play.mutate()}
+          >
+            Chơi trực tiếp
+          </button>
           <Link to={`/quizzes/${quiz.id}`} className={button.secondary}>
             Sửa
           </Link>

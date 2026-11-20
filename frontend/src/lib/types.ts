@@ -190,3 +190,56 @@ export interface AttemptResult {
     correct: boolean
   }[]
 }
+
+export type LiveStatus = 'lobby' | 'question' | 'reveal' | 'ended'
+
+/** Pushed to /topic/live/{pin} after every change; `version` only grows. */
+export interface LiveState {
+  pin: string
+  quizTitle: string
+  status: LiveStatus
+  version: number
+  serverTime: string
+  questionCount: number
+  question: LiveQuestion | null
+  answeredCount: number
+  players: LivePlayer[]
+}
+
+export interface LiveQuestion {
+  position: number
+  kind: QuestionKind
+  prompt: string
+  timeLimitSeconds: number
+  endsAt: string
+  options: string[]
+  /** Only in the reveal phase. */
+  reveal: {
+    correctOptions: number[]
+    acceptedAnswers: string[]
+    optionCounts: number[]
+    correctCount: number
+  } | null
+}
+
+export interface LivePlayer {
+  id: number
+  nickname: string
+  score: number
+  rank: number
+  /** Points won on the current question, only in the reveal phase; null if the player did not answer. */
+  lastPoints: number | null
+}
+
+export interface LiveJoin {
+  playerId: number
+  nickname: string
+  token: string
+}
+
+export interface LiveMe {
+  id: number
+  nickname: string
+  score: number
+  answered: boolean
+}

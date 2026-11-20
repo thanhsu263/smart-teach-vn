@@ -6,6 +6,8 @@ import { GuestOnly, RequireAuth } from './auth/RequireAuth'
 import { ClassDetailPage } from './classes/ClassDetailPage'
 import { ClassesPage } from './classes/ClassesPage'
 import { AppLayout } from './components/AppLayout'
+import { HostPage } from './live/HostPage'
+import { PlayPage } from './live/PlayPage'
 import { LoginPage } from './pages/LoginPage'
 import { RegisterPage } from './pages/RegisterPage'
 import { QuizEditorPage } from './quizzes/QuizEditorPage'
@@ -39,12 +41,16 @@ const router = createBrowserRouter([
           { path: '/assignments/:id/edit', element: <AssignmentEditorPage /> },
         ],
       },
+      // Full screen for the projector, without the app menu.
+      { path: '/live/:pin', element: <HostPage /> },
     ],
   },
   // Students: no account, open even when a teacher is logged in on the same browser.
   { path: '/s', element: <StartPage /> },
   { path: '/s/:code', element: <StartPage /> },
   { path: '/attempts/:id', element: <AttemptPage /> },
+  { path: '/play', element: <PlayPage /> },
+  { path: '/play/:pin', element: <PlayPage /> },
   { path: '*', element: <Navigate to="/" replace /> },
 ])
 
