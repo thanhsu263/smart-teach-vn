@@ -1,36 +1,118 @@
-# smart-teach-vn
+# SmartTeach
 
-SmartTeach helps Vietnamese high-school teachers manage classes, build quizzes and give
-assignments that students take with a personal access code. Spring Boot backend +
-React frontend.
+[![CI](https://github.com/thanhsu263/smart-teach-vn/actions/workflows/ci.yml/badge.svg)](https://github.com/thanhsu263/smart-teach-vn/actions/workflows/ci.yml)
 
-> Work in progress — this README will be expanded as features land.
+SmartTeach helps Vietnamese high-school teachers manage classes, build quizzes and give them
+to a class as assignments. Students do not need an account: each one gets a personal access
+code, opens the link the teacher shares, answers (autosaved) and gets graded on the server.
+The teacher sees the average score, the correct rate of every question and who has not
+started yet.
+
+It is a portfolio project for a Java backend internship: a Spring Boot REST API with JWT
+auth, SQL Server + Flyway, integration tests on a real database (Testcontainers) and a React
+frontend. The UI is in Vietnamese; code, API and docs are in English.
+
+**Live demo:** _link added after deploy_ · **API docs:** `<backend URL>/swagger-ui.html`
+
+Demo teacher account: `demo@smartteach.vn` / _password added after deploy_. The demo
+data is recreated every time the backend starts, so feel free to change anything.
+
+> The demo runs on free plans: the first request after a quiet period can take about a
+> minute while the backend and the database wake up.
+
+## Screenshots
+
+| Assignment analytics | Quiz editor |
+|---|---|
+| ![Assignment analytics](docs/screenshots/assignment-analytics.png) | ![Quiz editor](docs/screenshots/quiz-editor.png) |
+
+| Class and student codes | Assignments |
+|---|---|
+| ![Class detail](docs/screenshots/class-detail.png) | ![Assignments](docs/screenshots/assignments.png) |
+
+| Student answering | Student result |
+|---|---|
+| ![Student attempt](docs/screenshots/student-attempt.png) | ![Student result](docs/screenshots/student-result.png) |
+
+## Features
+
+- **Auth:** register / login, 15-minute JWT access token, rotating refresh token in an
+  `HttpOnly` cookie with reuse detection, roles `TEACHER` / `ADMIN`.
+- **Classes and students:** add many students at once; each gets a one-time-shown access code.
+- **Quizzes:** four question kinds (single, multiple, true/false, short text with
+  accent-insensitive matching), validated per kind, duplicate a quiz.
+- **Assignments:** publish freezes a snapshot of the quiz, students take it with their code,
+  answers autosave, grading happens on the server, results are revealed immediately or after
+  closing, per-question analytics.
+- **Data retention:** a nightly job deletes student attempts older than 90 days.
 
 ## Tech stack
 
 - **Backend:** Java 26, Spring Boot 4.1 (Web MVC, Security, OAuth2 Resource Server for JWT,
-  Data JPA, Validation, Actuator), Flyway, MapStruct, springdoc-openapi
-- **Database:** Microsoft SQL Server 2022
+  Data JPA, Validation, Actuator), Flyway, MapStruct, Lombok, springdoc-openapi
+- **Database:** Microsoft SQL Server 2022 (Azure SQL in production)
 - **Tests:** JUnit 5, Mockito, Testcontainers (real SQL Server), JaCoCo
 - **Frontend:** React + Vite + TypeScript, React Router, TanStack Query, Tailwind CSS,
   react-hook-form + zod, axios
+- **CI / deploy:** GitHub Actions, Docker, Render (backend), Vercel (frontend)
+
+## Architecture
+
+```mermaid
+flowchart LR
+    B[Browser] -->|pages| V[Vercel<br/>React build]
+    B -->|/api/*| V
+    V -->|rewrite /api/*| R[Render<br/>Spring Boot in Docker]
+    R -->|JDBC + Flyway| S[(Azure SQL)]
+```
+
+Vercel serves the frontend and forwards `/api/*` to the backend, so the browser talks to one
+site. The refresh cookie is then a first-party cookie and works with `SameSite=Lax`, even in
+browsers that block third-party cookies.
+
+The backend is split by feature (`auth`, `user`, `classroom`, `quiz`, `assignment`, `common`),
+each with `controller / service / repository / entity / dto / mapper`. The database schema and
+its rules are described in [docs/erd.md](docs/erd.md).
 
 ## Run locally
 
-Requirements: JDK 26, Node 24, Docker.
+Requirements: Docker. For development also JDK 26 and Node 24.
 
 ```bash
-cp .env.example .env              # then change the passwords and JWT_SECRET
-docker compose up -d              # SQL Server on localhost:14333 + creates the database
+git clone https://github.com/thanhsu263/smart-teach-vn.git
+cd smart-teach-vn
+cp .env.example .env              # then change the passwords, JWT_SECRET and DEMO_PASSWORD
+```
+
+### Option A: backend in Docker, with demo data
+
+```bash
+docker compose --profile app up -d --build   # SQL Server + backend (demo profile)
+curl http://localhost:8080/actuator/health   # {"status":"UP",...}
+
+cd frontend
+npm install
+npm run dev                                  # http://localhost:5173
+```
+
+Sign in with `DEMO_EMAIL` / `DEMO_PASSWORD` from your `.env`. The first build downloads the
+Maven dependencies and takes a few minutes.
+
+### Option B: backend from source (for development)
+
+```bash
+docker compose up -d              # only SQL Server on localhost:14333 + creates the database
 
 cd backend
 ./mvnw spring-boot:run            # Flyway applies migrations on startup
-curl http://localhost:8080/actuator/health
 
 cd ../frontend
 npm install
 npm run dev                       # http://localhost:5173
 ```
+
+Register a new teacher in the UI, or run the backend with demo data:
+`SPRING_PROFILES_ACTIVE=demo ./mvnw spring-boot:run`.
 
 The backend reads `../.env` automatically, so no extra environment setup is needed when
 running from `backend/`. In dev the Vite server proxies `/api` to the backend port from
@@ -46,12 +128,32 @@ API docs (Swagger UI): http://localhost:8080/swagger-ui.html
 | `DB_PORT` | both | Host port of SQL Server (default `14333`) |
 | `DB_URL` | backend | Full JDBC URL; overrides the local default (cloud deploys) |
 | `DB_USERNAME`, `DB_PASSWORD` | backend | Database credentials |
-| `SERVER_PORT` | backend, Vite proxy | Backend port (default `8080`) |
+| `SERVER_PORT` | backend, Vite proxy | Backend port (default `8080`; `PORT` is used too, as set by Render) |
 | `JWT_SECRET` | backend | HS256 key, **at least 32 bytes** (`openssl rand -base64 48`); the app refuses to start without it |
 | `CORS_ALLOWED_ORIGINS` | backend | Comma-separated frontend origins (default `http://localhost:5173`) |
 | `AUTH_COOKIE_SECURE` | backend | `true` in production (HTTPS) |
 | `AUTH_COOKIE_SAME_SITE` | backend | `Lax` by default; `None` when frontend and backend are on different sites |
-| `VITE_API_URL` | frontend build | Backend origin in production; leave empty in dev |
+| `SPRING_PROFILES_ACTIVE` | backend | `demo` recreates the demo teacher and their data on every start |
+| `DEMO_EMAIL`, `DEMO_PASSWORD` | backend (demo profile) | Demo teacher account; the password must have at least 8 characters |
+| `VITE_API_URL` | frontend build | Backend origin; leave empty when `/api` is proxied (dev server, Vercel) |
+
+## Deploy
+
+The repository contains the configuration for a free deployment:
+
+- **Database – Azure SQL Database** (free offer). Create a server and a database named
+  `smartteach`, then allow the backend's outbound IP addresses in the server firewall.
+  Flyway creates the schema on the first start.
+- **Backend – Render** with [`render.yaml`](render.yaml) (Dashboard → New → Blueprint). It
+  builds [`backend/Dockerfile`](backend/Dockerfile): a multi-stage build (JDK 26 + Maven →
+  JRE 26), running as a non-root user with the heap sized for a 512 MB container. Render
+  asks for the secret values (`DB_URL`, `DB_USERNAME`, `DB_PASSWORD`, `CORS_ALLOWED_ORIGINS`,
+  `DEMO_PASSWORD`) and generates `JWT_SECRET`. The health check is
+  `/actuator/health/liveness`, which does not depend on the database.
+- **Frontend – Vercel** with root directory `frontend`.
+  [`frontend/vercel.json`](frontend/vercel.json) rewrites `/api/*` to the Render URL and every
+  other path to `index.html` (client-side routing). Set `CORS_ALLOWED_ORIGINS` on Render to
+  the Vercel URL.
 
 ## Authentication
 
@@ -222,7 +324,8 @@ paths, the 3-query read and deleting a quiz that an assignment still points to.
 Assignment tests cover grading for every kind (unit tests), the publish and schedule rules
 (Mockito), and over HTTP the full flow publish → start → autosave → submit → analytics, hidden
 answers before submitting, both reveal policies, 404 for wrong codes and tokens, invalidation
-after a new access code, and the 90-day retention job.
+after a new access code, and the 90-day retention job. A demo-data test checks that the seed
+builds the expected classes, quizzes and results and can run twice.
 
 The JaCoCo report is written to `backend/target/site/jacoco/index.html`. `mvn verify` fails if
 line coverage of any `service` package drops below 70%.
