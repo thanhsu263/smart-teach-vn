@@ -25,6 +25,8 @@ public class SecurityConfig {
     private static final String[] PUBLIC_PATHS = {
             "/api/auth/**",
             "/api/public/**",
+            // STOMP handshake; the socket only pushes public room states (see WebSocketConfig).
+            "/ws", "/ws/**",
             "/actuator/health", "/actuator/health/**",
             "/swagger-ui.html", "/swagger-ui/**", "/v3/api-docs/**",
             "/error"
@@ -83,8 +85,8 @@ public class SecurityConfig {
         CorsConfiguration config = new CorsConfiguration();
         config.setAllowedOrigins(properties.allowedOrigins());
         config.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS"));
-        // X-Attempt-Token: students have no account, see AttemptController.
-        config.setAllowedHeaders(List.of("Authorization", "Content-Type", "X-Attempt-Token"));
+        // X-Attempt-Token / X-Player-Token: students have no account, see AttemptController.
+        config.setAllowedHeaders(List.of("Authorization", "Content-Type", "X-Attempt-Token", "X-Player-Token"));
         config.setAllowCredentials(true);
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
         source.registerCorsConfiguration("/api/**", config);
