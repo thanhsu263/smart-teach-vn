@@ -72,7 +72,7 @@ export function AssignmentsPage() {
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-lg font-semibold text-slate-900">{a.title}</p>
                   <p className="text-sm text-slate-500">
-                    Lớp {a.className}
+                    {a.className}
                     {a.dueAt && ` · Hạn ${dateFormat.format(new Date(a.dueAt))}`}
                   </p>
                 </div>
