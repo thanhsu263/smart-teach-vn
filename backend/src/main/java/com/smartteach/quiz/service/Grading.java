@@ -1,4 +1,4 @@
-package com.smartteach.assignment.service;
+package com.smartteach.quiz.service;
 
 import com.smartteach.quiz.dto.OptionResponse;
 import com.smartteach.quiz.dto.QuestionResponse;
@@ -12,9 +12,9 @@ import java.util.stream.IntStream;
 import tools.jackson.databind.JsonNode;
 
 /** Pure functions: what a valid answer looks like for each question kind, and whether it is correct. */
-final class Grading {
+public final class Grading {
 
-    static final int MAX_TEXT_ANSWER = 200;
+    public static final int MAX_TEXT_ANSWER = 200;
     private static final Pattern COMBINING_MARKS = Pattern.compile("\\p{M}+");
     private static final Pattern SPACES = Pattern.compile("\\s+");
 
@@ -22,7 +22,7 @@ final class Grading {
     }
 
     /** Returns null when the answer has the right shape for the question, otherwise the reason. */
-    static String checkShape(QuestionResponse question, JsonNode answer) {
+    public static String checkShape(QuestionResponse question, JsonNode answer) {
         int optionCount = question.options().size();
         return switch (question.kind()) {
             case SINGLE, TRUE_FALSE -> isOptionIndex(answer, optionCount) ? null
@@ -36,7 +36,7 @@ final class Grading {
     }
 
     /** Expects an answer that passed {@link #checkShape}. */
-    static boolean isCorrect(QuestionResponse question, JsonNode answer) {
+    public static boolean isCorrect(QuestionResponse question, JsonNode answer) {
         return switch (question.kind()) {
             case SINGLE, TRUE_FALSE -> question.options().get(answer.intValue()).correct();
             // All correct options and nothing else: no partial credit.
@@ -54,7 +54,7 @@ final class Grading {
      * "phan xi pang" are equal: NFD splits "ă" into "a" + a combining mark that is then removed.
      * "đ" is a letter of its own in Unicode, not d + mark, so it is replaced explicitly.
      */
-    static String normalize(String text, boolean ignoreDiacritics) {
+    public static String normalize(String text, boolean ignoreDiacritics) {
         String result = SPACES.matcher(text.strip()).replaceAll(" ").toLowerCase(Locale.ROOT);
         if (ignoreDiacritics) {
             result = result.replace('đ', 'd');
@@ -64,7 +64,7 @@ final class Grading {
     }
 
     /** Percentage rounded to the nearest whole number (0-100, like the database column). */
-    static int score(int correct, int total) {
+    public static int score(int correct, int total) {
         return total == 0 ? 0 : (int) Math.round(100.0 * correct / total);
     }
 

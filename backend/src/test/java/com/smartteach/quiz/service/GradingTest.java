@@ -1,4 +1,4 @@
-package com.smartteach.assignment.service;
+package com.smartteach.quiz.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
