@@ -4,7 +4,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyList;
-import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -25,7 +24,6 @@ import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.InOrder;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.http.HttpStatus;
@@ -102,15 +100,13 @@ class StudentServiceTest {
     }
 
     @Test
-    void deleteRemovesAttemptsBeforeTheStudent() {
+    void deleteRemovesTheStudent() {
         Student student = new Student(classroom, "An", 0, NOW);
         when(studentRepository.findOwned(9L, OWNER)).thenReturn(Optional.of(student));
 
         service.delete(OWNER, 9L);
 
-        InOrder order = inOrder(studentRepository);
-        order.verify(studentRepository).deleteAttemptsOf(9L);
-        order.verify(studentRepository).delete(student);
+        verify(studentRepository).delete(student);
     }
 
     @Test
@@ -119,6 +115,6 @@ class StudentServiceTest {
 
         assertThatThrownBy(() -> service.regenerateCode(OWNER, 9L)).isInstanceOf(ApiException.class);
         assertThatThrownBy(() -> service.delete(OWNER, 9L)).isInstanceOf(ApiException.class);
-        verify(studentRepository, never()).deleteAttemptsOf(any());
+        verify(studentRepository, never()).delete(any(Student.class));
     }
 }

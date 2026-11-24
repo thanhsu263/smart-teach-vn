@@ -1,10 +1,9 @@
 -- Students have no account: entering their access code on an assignment gives them a random
 -- attempt token. Only its SHA-256 hash is stored, like access codes, so it can be revoked
 -- (new access code) and looked up with one indexed read.
-ALTER TABLE attempts ADD
-    token_hash        NVARCHAR(64)  NULL,
-    token_expires_at  DATETIME2     NULL;
-GO
+ALTER TABLE attempts
+    ADD COLUMN token_hash        VARCHAR(64)  NULL,
+    ADD COLUMN token_expires_at  TIMESTAMPTZ  NULL;
 
 CREATE UNIQUE INDEX ux_attempts_token_hash ON attempts (token_hash) WHERE token_hash IS NOT NULL;
 

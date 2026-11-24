@@ -165,9 +165,12 @@ class QuizIntegrationTest extends IntegrationTest {
 
         perform(teacher, delete("/api/quizzes/" + quizId)).andExpect(status().isNoContent());
 
-        var row = jdbc.queryForMap("SELECT quiz_id, quiz_snapshot FROM assignments WHERE id = ?", assignmentId);
+        // jsonb is stored normalised, so compare as jsonb rather than as text.
+        var row = jdbc.queryForMap("""
+                SELECT quiz_id, quiz_snapshot = '{"questions":[]}'::jsonb AS snapshot_kept
+                FROM assignments WHERE id = ?""", assignmentId);
         assertThat(row.get("quiz_id")).isNull();
-        assertThat(row.get("quiz_snapshot")).isEqualTo("{\"questions\":[]}");
+        assertThat(row.get("snapshot_kept")).isEqualTo(true);
     }
 
     @Test
@@ -236,7 +239,7 @@ class QuizIntegrationTest extends IntegrationTest {
         String code = String.format("%010X", System.nanoTime() & 0xFFFFFFFFFFL);
         jdbc.update("""
                 INSERT INTO assignments (owner_id, class_id, quiz_id, title, public_code, status, quiz_snapshot)
-                VALUES (?, ?, ?, N'Bài 1', ?, N'published', N'{"questions":[]}')""", ownerId, classId, quizId, code);
+                VALUES (?, ?, ?, 'Bài 1', ?, 'published', '{"questions":[]}')""", ownerId, classId, quizId, code);
         return jdbc.queryForObject("SELECT id FROM assignments WHERE public_code = ?", Long.class, code);
     }
 }

@@ -10,7 +10,7 @@ started yet. In class, the teacher can also run a quiz as a **live game**: stude
 6-digit PIN and a nickname, and answers and rankings update on every screen in real time.
 
 It is a portfolio project for a Java backend internship: a Spring Boot REST API with JWT
-auth, SQL Server + Flyway, integration tests on a real database (Testcontainers) and a React
+auth, PostgreSQL + Flyway, integration tests on a real database (Testcontainers) and a React
 frontend. The UI is in Vietnamese; code, API and docs are in English.
 
 **Live demo:** _link added after deploy_ · **API docs:** `<backend URL>/swagger-ui.html`
@@ -61,8 +61,8 @@ data is recreated every time the backend starts, so feel free to change anything
 
 - **Backend:** Java 26, Spring Boot 4.1 (Web MVC, Security, OAuth2 Resource Server for JWT,
   Data JPA, Validation, Actuator, WebSocket + STOMP), Flyway, MapStruct, Lombok, springdoc-openapi
-- **Database:** Microsoft SQL Server 2022 (Azure SQL in production)
-- **Tests:** JUnit 5, Mockito, Testcontainers (real SQL Server), JaCoCo
+- **Database:** PostgreSQL 18 (Neon in production)
+- **Tests:** JUnit 5, Mockito, Testcontainers (real PostgreSQL), JaCoCo
 - **Frontend:** React + Vite + TypeScript, React Router, TanStack Query, Tailwind CSS,
   react-hook-form + zod, axios, @stomp/stompjs
 - **CI / deploy:** GitHub Actions, Docker, Render (backend), Vercel (frontend)
@@ -75,7 +75,7 @@ flowchart LR
     B -->|/api/*| V
     V -->|rewrite /api/*| R[Render<br/>Spring Boot in Docker]
     B -.->|WebSocket /ws<br/>live quiz only| R
-    R -->|JDBC + Flyway| S[(Azure SQL)]
+    R -->|JDBC + Flyway| S[(Neon<br/>PostgreSQL)]
 ```
 
 Vercel serves the frontend and forwards `/api/*` to the backend, so the browser talks to one
@@ -100,7 +100,7 @@ cp .env.example .env              # then change the passwords, JWT_SECRET and DE
 ### Option A: backend in Docker, with demo data
 
 ```bash
-docker compose --profile app up -d --build   # SQL Server + backend (demo profile)
+docker compose --profile app up -d --build   # PostgreSQL + backend (demo profile)
 curl http://localhost:8080/actuator/health   # {"status":"UP",...}
 
 cd frontend
@@ -114,7 +114,7 @@ Maven dependencies and takes a few minutes.
 ### Option B: backend from source (for development)
 
 ```bash
-docker compose up -d              # only SQL Server on localhost:14333 + creates the database
+docker compose up -d              # only PostgreSQL on localhost:5432 (database smartteach)
 
 cd backend
 ./mvnw spring-boot:run            # Flyway applies migrations on startup
@@ -138,10 +138,10 @@ API docs (Swagger UI): http://localhost:8080/swagger-ui.html
 
 | Variable | Used by | Description |
 |---|---|---|
-| `MSSQL_SA_PASSWORD` | docker compose | SQL Server `sa` password |
-| `DB_PORT` | both | Host port of SQL Server (default `14333`) |
+| `POSTGRES_PASSWORD` | docker compose | Password of the `smartteach` database user |
+| `DB_PORT` | both | Host port of PostgreSQL (default `5432`) |
 | `DB_URL` | backend | Full JDBC URL; overrides the local default (cloud deploys) |
-| `DB_USERNAME`, `DB_PASSWORD` | backend | Database credentials |
+| `DB_USERNAME`, `DB_PASSWORD` | backend | Database credentials (locally `smartteach` / same as `POSTGRES_PASSWORD`) |
 | `SERVER_PORT` | backend, Vite proxy | Backend port (default `8080`; `PORT` is used too, as set by Render) |
 | `JWT_SECRET` | backend | HS256 key, **at least 32 bytes** (`openssl rand -base64 48`); the app refuses to start without it |
 | `CORS_ALLOWED_ORIGINS` | backend | Comma-separated frontend origins (default `http://localhost:5173`) |
@@ -156,9 +156,10 @@ API docs (Swagger UI): http://localhost:8080/swagger-ui.html
 
 The repository contains the configuration for a free deployment:
 
-- **Database – Azure SQL Database** (free offer). Create a server and a database named
-  `smartteach`, then allow the backend's outbound IP addresses in the server firewall.
-  Flyway creates the schema on the first start.
+- **Database – Neon** (free PostgreSQL, region Singapore, same as the backend). Create a
+  project and use its connection string as
+  `DB_URL=jdbc:postgresql://<host>/<db>?sslmode=require`. Flyway creates the schema on the
+  first start.
 - **Backend – Render** with [`render.yaml`](render.yaml) (Dashboard → New → Blueprint). It
   builds [`backend/Dockerfile`](backend/Dockerfile): a multi-stage build (JDK 26 + Maven →
   JRE 26), running as a non-root user with the heap sized for a 512 MB container. Render
@@ -174,7 +175,9 @@ The repository contains the configuration for a free deployment:
 ## Authentication
 
 Teachers sign up and sign in with email + password (BCrypt). Public sign-up always creates a
-`TEACHER`; `ADMIN` accounts are created directly in the database.
+`TEACHER`; `ADMIN` accounts are created directly in the database. Emails are
+stored lower-case, and a unique index on `lower(email)` makes the database reject two emails
+that differ only in case.
 
 | Endpoint | Description |
 |---|---|
@@ -220,7 +223,7 @@ will use to open assignments.
 
 Design notes:
 
-- **Ownership:** there is no row-level security in SQL Server here, so every query filters by
+- **Ownership:** the app does not use PostgreSQL row-level security, so every query filters by
   `owner_id = current user`. Another teacher's class or student returns **404**, not 403, so
   ids of other teachers' data cannot be probed.
 - **Access codes are shown once.** Only a SHA-256 hash and the last 4 characters (`code_hint`)
@@ -229,9 +232,8 @@ Design notes:
   look-alike characters such as `0/O`, `1/I/L`), not passwords chosen by people.
 - **Bulk add** locks the class row (`PESSIMISTIC_WRITE`), so the 100-student limit and the
   positions stay correct when two requests arrive together.
-- **Deletes:** SQL Server does not allow two cascade paths to `attempts`, so deleting a class
-  relies on `ON DELETE CASCADE` through assignments, and deleting a student first deletes that
-  student's attempts in the same transaction.
+- **Deletes** are done by the database with `ON DELETE CASCADE`: deleting a class removes its
+  students, assignments and attempts; deleting a student removes that student's attempts.
 
 ## Quizzes
 
@@ -269,7 +271,8 @@ Design notes:
   per kind and returns every error with its path, e.g. `questions[1].options`, so the editor can
   show it next to the right question.
 - **Deleting a quiz keeps assignments.** An assignment stores a JSON snapshot of the quiz when
-  it is published, so deleting the quiz only clears `assignments.quiz_id`.
+  it is published, so deleting the quiz only clears `assignments.quiz_id`
+  (`ON DELETE SET NULL`).
 
 ## Assignments
 
@@ -304,10 +307,10 @@ with `after_close` only after the due date or when the teacher closes the assign
 
 Design notes:
 
-- **Snapshot on publish.** Publishing copies the quiz into `assignments.quiz_snapshot` (JSON).
+- **Snapshot on publish.** Publishing copies the quiz into `assignments.quiz_snapshot` (JSONB).
   Editing or deleting the quiz later does not change an assignment students are already taking,
   and grading always uses the snapshot. After publishing, class and quiz cannot be changed.
-- **One attempt per student.** A filtered unique index on `(assignment_id, student_id) WHERE
+- **One attempt per student.** A partial unique index on `(assignment_id, student_id) WHERE
   status = 'in_progress'` makes two parallel "start" requests unable to create two attempts.
   Starting again (e.g. on another device) reuses the attempt with a new token.
 - **Attempt tokens** are random; only their SHA-256 hash is stored. A wrong assignment code,
@@ -385,7 +388,7 @@ cd backend && ./mvnw verify       # needs Docker running (Testcontainers)
 cd frontend && npm run lint && npm run build
 ```
 
-Integration tests start one SQL Server container and share a single Spring context. Auth tests
+Integration tests start one PostgreSQL container and share a single Spring context. Auth tests
 cover wrong password, expired and tampered tokens, refresh-token rotation and reuse, logout,
 validation errors and role-protected endpoints (401 / 403 / 200). Class tests cover the full
 CRUD flow, "another teacher gets 404" on every endpoint, one-time codes and stored hashes,

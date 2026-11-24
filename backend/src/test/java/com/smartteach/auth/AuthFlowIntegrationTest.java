@@ -1,6 +1,7 @@
 package com.smartteach.auth;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
@@ -16,8 +17,10 @@ import java.time.temporal.ChronoUnit;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.oauth2.jose.jws.MacAlgorithm;
 import org.springframework.security.oauth2.jwt.JwsHeader;
 import org.springframework.security.oauth2.jwt.JwtClaimsSet;
@@ -33,6 +36,9 @@ class AuthFlowIntegrationTest extends IntegrationTest {
 
     @Autowired
     JwtEncoder jwtEncoder;
+
+    @Autowired
+    JdbcTemplate jdbc;
 
     @Test
     void registerReturnsTokenAndCookieThenMeWorks() throws Exception {
@@ -65,6 +71,18 @@ class AuthFlowIntegrationTest extends IntegrationTest {
                 .andExpect(status().isConflict())
                 .andExpect(jsonPath("$.detail").value("Email is already registered"));
         login("  " + email.toUpperCase() + " ", PASSWORD).andExpect(status().isOk());
+    }
+
+    @Test
+    void databaseRejectsEmailsThatDifferOnlyInCase() throws Exception {
+        String email = uniqueEmail();
+        register(email).andExpect(status().isCreated());
+
+        // Bypasses the service's lower-casing: the unique index on lower(email) is the last guard.
+        assertThatThrownBy(() -> jdbc.update(
+                        "INSERT INTO users (email, password_hash, full_name, role) VALUES (?, 'x', 'B', 'TEACHER')",
+                        email.toUpperCase()))
+                .isInstanceOf(DuplicateKeyException.class);
     }
 
     @Test

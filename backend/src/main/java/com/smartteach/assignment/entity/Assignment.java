@@ -11,7 +11,8 @@ import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
-import org.hibernate.Length;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
 /**
  * A quiz given to a class. On publish the quiz is copied into {@code quizSnapshot} (JSON), so later
@@ -44,7 +45,8 @@ public class Assignment {
     @Column(nullable = false, length = 1000)
     private String description;
 
-    @Column(name = "quiz_snapshot", length = Length.LONG32)
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(name = "quiz_snapshot")
     private String quizSnapshot;
 
     @Column(name = "public_code", nullable = false, length = 10, updatable = false)

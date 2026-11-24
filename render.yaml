@@ -6,11 +6,11 @@ services:
     name: smartteach-api
     runtime: docker
     plan: free
-    # Same region as the Azure SQL database (Southeast Asia) to keep queries fast.
+    # Same region as the Neon PostgreSQL database (Singapore) to keep queries fast.
     region: singapore
     dockerContext: ./backend
     dockerfilePath: ./backend/Dockerfile
-    # Liveness does not touch the database, so a sleeping Azure SQL database does not
+    # Liveness does not touch the database, so a database that is waking up does not
     # make Render restart the service.
     healthCheckPath: /actuator/health/liveness
     buildFilter:
@@ -19,7 +19,7 @@ services:
     envVars:
       - key: SPRING_PROFILES_ACTIVE
         value: demo
-      # jdbc:sqlserver://<server>.database.windows.net:1433;databaseName=smartteach;encrypt=true;trustServerCertificate=false;hostNameInCertificate=*.database.windows.net;loginTimeout=60
+      # jdbc:postgresql://<host>/<db>?sslmode=require
       - key: DB_URL
         sync: false
       - key: DB_USERNAME
@@ -36,7 +36,7 @@ services:
         value: "true"
       - key: AUTH_COOKIE_SAME_SITE
         value: Lax
-      # A paused free Azure SQL database needs up to a minute to wake up: keep retrying at startup.
+      # A suspended free database takes a few seconds to wake up: keep retrying at startup.
       - key: SPRING_FLYWAY_CONNECTRETRIES
         value: "10"
       - key: DEMO_EMAIL

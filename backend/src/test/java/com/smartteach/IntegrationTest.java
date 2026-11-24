@@ -17,7 +17,7 @@ import org.springframework.test.web.servlet.ResultActions;
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
 
 /**
- * Base class for tests against the full app and a real SQL Server container. Every subclass
+ * Base class for tests against the full app and a real PostgreSQL container. Every subclass
  * uses the same configuration, so Spring reuses one context and one container for all of them.
  */
 // A real port so the live quiz tests can also connect over WebSocket.

@@ -1,7 +1,7 @@
 # Database (ERD)
 
-SQL Server, created by Flyway (`backend/src/main/resources/db/migration`). Text columns are
-`NVARCHAR`, times are `DATETIME2` in UTC. Audit columns (`created_at`, `updated_at`) are left out
+PostgreSQL 18, created by Flyway (`backend/src/main/resources/db/migration`). Text columns are
+`VARCHAR` (UTF-8), times are `TIMESTAMPTZ` and the quiz snapshot is `JSONB`. Audit columns (`created_at`, `updated_at`) are left out
 of the diagram.
 
 ```mermaid
@@ -22,80 +22,80 @@ erDiagram
 
     users {
         bigint id PK
-        nvarchar email UK
-        nvarchar password_hash "BCrypt"
-        nvarchar full_name
-        nvarchar role "TEACHER | ADMIN"
+        varchar email UK
+        varchar password_hash "BCrypt"
+        varchar full_name
+        varchar role "TEACHER | ADMIN"
     }
     refresh_tokens {
         bigint id PK
         bigint user_id FK
-        nvarchar token_hash UK "SHA-256"
-        uniqueidentifier family_id "rotation chain"
-        datetime2 expires_at
-        datetime2 revoked_at
+        varchar token_hash UK "SHA-256"
+        uuid family_id "rotation chain"
+        timestamptz expires_at
+        timestamptz revoked_at
     }
     classes {
         bigint id PK
         bigint owner_id FK
-        nvarchar name
+        varchar name
     }
     students {
         bigint id PK
         bigint class_id FK
-        nvarchar name
+        varchar name
         int position
-        nvarchar access_code_hash "SHA-256, indexed"
-        nvarchar code_hint "last 4 chars"
+        varchar access_code_hash "SHA-256, indexed"
+        varchar code_hint "last 4 chars"
     }
     quizzes {
         bigint id PK
         bigint owner_id FK
-        nvarchar title
+        varchar title
     }
     questions {
         bigint id PK
         bigint quiz_id FK
         int position
-        nvarchar kind "single | true_false | multi | short_text"
-        nvarchar prompt
+        varchar kind "single | true_false | multi | short_text"
+        varchar prompt
         int time_limit_s
-        bit ignore_diacritics
+        boolean ignore_diacritics
     }
     options {
         bigint id PK
         bigint question_id FK
         int position
-        nvarchar label
-        bit is_correct
+        varchar label
+        boolean is_correct
     }
     question_accepted_answers {
         bigint id PK
         bigint question_id FK
-        nvarchar value
+        varchar value
     }
     assignments {
         bigint id PK
         bigint owner_id FK
         bigint class_id FK
         bigint quiz_id FK "NULL after the quiz is deleted"
-        nvarchar title
-        nvarchar quiz_snapshot "JSON, frozen on publish"
-        nvarchar public_code UK "10 hex chars"
-        datetime2 opens_at
-        datetime2 due_at
-        nvarchar reveal_policy "immediate | after_close"
-        nvarchar status "draft | published | closed"
-        datetime2 closed_at
+        varchar title
+        jsonb quiz_snapshot "frozen on publish"
+        varchar public_code UK "10 hex chars"
+        timestamptz opens_at
+        timestamptz due_at
+        varchar reveal_policy "immediate | after_close"
+        varchar status "draft | published | closed"
+        timestamptz closed_at
     }
     attempts {
         bigint id PK
         bigint assignment_id FK
         bigint student_id FK
-        nvarchar status "in_progress | submitted | invalidated"
-        nvarchar token_hash UK "SHA-256 of the attempt token"
-        datetime2 started_at
-        datetime2 submitted_at
+        varchar status "in_progress | submitted | invalidated"
+        varchar token_hash UK "SHA-256 of the attempt token"
+        timestamptz started_at
+        timestamptz submitted_at
         int score
         int correct_count
         int question_total
@@ -104,18 +104,23 @@ erDiagram
         bigint id PK
         bigint attempt_id FK
         int position
-        nvarchar answer "JSON"
-        bit is_correct "set on submit"
+        varchar answer "JSON"
+        boolean is_correct "set on submit"
     }
 ```
 
 Rules enforced by the database:
 
-- `attempts`: filtered unique index on `(assignment_id, student_id) WHERE status = 'in_progress'`,
-  so one student cannot have two attempts in progress for the same assignment.
+- `users`: unique index on `lower(email)`, so two emails that differ only in case cannot both
+  be registered (the service also lower-cases emails before saving them).
+- `attempts`: partial unique index on `(assignment_id, student_id) WHERE status = 'in_progress'`,
+  so one student cannot have two attempts in progress for the same assignment, even when two
+  "start" requests arrive at the same time.
 - CHECK constraints for every enum column, text lengths, `due_at > opens_at`, the `public_code`
-  format, a valid JSON snapshot once published and
+  format (`^[0-9A-F]{10}$`), a snapshot once published and
   "`closed_at` is set only when the status is `closed`" (same idea for `submitted_at`).
-- SQL Server allows only one cascade path to a table. Deleting a class cascades to its
-  assignments and their attempts; deleting a student removes that student's attempts in the
-  service first.
+- Deletes cascade: deleting a class removes its students, assignments and their attempts;
+  deleting a student removes that student's attempts; deleting a quiz keeps the assignments made
+  from it (`quiz_id` becomes `NULL`, the snapshot stays).
+- PostgreSQL does not index foreign keys by itself, so every foreign key used in a lookup or a
+  cascade has its own index.
