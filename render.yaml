@@ -39,6 +39,16 @@ services:
       # A paused free Azure SQL database needs up to a minute to wake up: keep retrying at startup.
       - key: SPRING_FLYWAY_CONNECTRETRIES
         value: "10"
+      # Free Azure SQL spends its 100k vCore-seconds a month whenever it is online, and any open
+      # connection keeps it online. Close idle connections so it can pause; wait long enough for it to wake.
+      - key: SPRING_DATASOURCE_HIKARI_MINIMUMIDLE
+        value: "0"
+      - key: SPRING_DATASOURCE_HIKARI_IDLETIMEOUT
+        value: "60000"
+      - key: SPRING_DATASOURCE_HIKARI_MAXIMUMPOOLSIZE
+        value: "5"
+      - key: SPRING_DATASOURCE_HIKARI_CONNECTIONTIMEOUT
+        value: "90000"
       - key: DEMO_EMAIL
         value: demo@smartteach.vn
       - key: DEMO_PASSWORD

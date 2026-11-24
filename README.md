@@ -1,6 +1,7 @@
 # SmartTeach
 
 [![CI](https://github.com/thanhsu263/smart-teach-vn/actions/workflows/ci.yml/badge.svg)](https://github.com/thanhsu263/smart-teach-vn/actions/workflows/ci.yml)
+[![Coverage](https://raw.githubusercontent.com/thanhsu263/smart-teach-vn/badges/jacoco.svg)](https://github.com/thanhsu263/smart-teach-vn/actions/workflows/ci.yml)
 
 SmartTeach helps Vietnamese high-school teachers manage classes, build quizzes and give them
 to a class as assignments. Students do not need an account: each one gets a personal access
@@ -159,6 +160,9 @@ The repository contains the configuration for a free deployment:
 - **Database – Azure SQL Database** (free offer). Create a server and a database named
   `smartteach`, then allow the backend's outbound IP addresses in the server firewall.
   Flyway creates the schema on the first start.
+  The free database pauses after 15 idle minutes and counts vCore-seconds while it is
+  online, so `render.yaml` lets Hikari close idle connections (`minimumIdle=0`) and wait up to
+  90 s for a paused database to wake.
 - **Backend – Render** with [`render.yaml`](render.yaml) (Dashboard → New → Blueprint). It
   builds [`backend/Dockerfile`](backend/Dockerfile): a multi-stage build (JDK 26 + Maven →
   JRE 26), running as a non-root user with the heap sized for a 512 MB container. Render
