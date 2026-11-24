@@ -30,6 +30,37 @@ jobs:
           path: backend/target/site/jacoco
           if-no-files-found: ignore
 
+  # Publishes the coverage badge to a separate "badges" branch so main gets no bot commits.
+  coverage-badge:
+    needs: backend
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v5
+        with:
+          name: jacoco-report
+          path: jacoco
+      - uses: cicirello/jacoco-badge-generator@v2
+        with:
+          jacoco-csv-file: jacoco/jacoco.csv
+          badges-directory: badges
+      - name: Push badge to the badges branch
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        # The generator is a Docker action, so its output is root-owned: copy it out before git init.
+        run: |
+          mkdir "$RUNNER_TEMP/badges"
+          cp badges/jacoco.svg "$RUNNER_TEMP/badges/"
+          cd "$RUNNER_TEMP/badges"
+          git init -q -b badges
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add jacoco.svg
+          git commit -q -m "chore: update coverage badge"
+          git push -q --force "https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" badges
+
   frontend:
     runs-on: ubuntu-latest
     defaults:

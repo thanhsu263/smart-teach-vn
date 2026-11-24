@@ -1,6 +1,7 @@
 # SmartTeach
 
 [![CI](https://github.com/thanhsu263/smart-teach-vn/actions/workflows/ci.yml/badge.svg)](https://github.com/thanhsu263/smart-teach-vn/actions/workflows/ci.yml)
+[![Coverage](https://raw.githubusercontent.com/thanhsu263/smart-teach-vn/badges/jacoco.svg)](https://github.com/thanhsu263/smart-teach-vn/actions/workflows/ci.yml)
 
 SmartTeach helps Vietnamese high-school teachers manage classes, build quizzes and give them
 to a class as assignments. Students do not need an account: each one gets a personal access
@@ -159,7 +160,10 @@ The repository contains the configuration for a free deployment:
 - **Database – Neon** (free PostgreSQL, region Singapore, same as the backend). Create a
   project and use its connection string as
   `DB_URL=jdbc:postgresql://<host>/<db>?sslmode=require`. Flyway creates the schema on the
-  first start.
+  first start. Use the direct host, not the `-pooler` one: the app already pools connections
+  with Hikari, and migrations are safer on a plain session. The free database suspends after
+  5 idle minutes and counts compute time while any connection is open, so `render.yaml` lets
+  Hikari close idle connections (`minimumIdle=0`).
 - **Backend – Render** with [`render.yaml`](render.yaml) (Dashboard → New → Blueprint). It
   builds [`backend/Dockerfile`](backend/Dockerfile): a multi-stage build (JDK 26 + Maven →
   JRE 26), running as a non-root user with the heap sized for a 512 MB container. Render

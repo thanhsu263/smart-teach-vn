@@ -19,7 +19,7 @@ services:
     envVars:
       - key: SPRING_PROFILES_ACTIVE
         value: demo
-      # jdbc:postgresql://<host>/<db>?sslmode=require
+      # jdbc:postgresql://<host>/<db>?sslmode=require (Neon's direct host, not the "-pooler" one)
       - key: DB_URL
         sync: false
       - key: DB_USERNAME
@@ -39,6 +39,14 @@ services:
       # A suspended free database takes a few seconds to wake up: keep retrying at startup.
       - key: SPRING_FLYWAY_CONNECTRETRIES
         value: "10"
+      # Free Neon has 100 compute-hours a month and suspends after 5 idle minutes, but any open
+      # connection keeps it running. Let Hikari close idle connections so the database can sleep.
+      - key: SPRING_DATASOURCE_HIKARI_MINIMUMIDLE
+        value: "0"
+      - key: SPRING_DATASOURCE_HIKARI_IDLETIMEOUT
+        value: "60000"
+      - key: SPRING_DATASOURCE_HIKARI_MAXIMUMPOOLSIZE
+        value: "5"
       - key: DEMO_EMAIL
         value: demo@smartteach.vn
       - key: DEMO_PASSWORD
