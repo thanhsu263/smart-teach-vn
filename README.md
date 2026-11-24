@@ -14,13 +14,15 @@ It is a portfolio project for a Java backend internship: a Spring Boot REST API 
 auth, PostgreSQL + Flyway, integration tests on a real database (Testcontainers) and a React
 frontend. The UI is in Vietnamese; code, API and docs are in English.
 
-**Live demo:** _link added after deploy_ · **API docs:** `<backend URL>/swagger-ui.html`
+**Live demo:** https://smart-teach-vn.vercel.app · **API docs:**
+https://smartteach-api.onrender.com/swagger-ui.html
 
-Demo teacher account: `demo@smartteach.vn` / _password added after deploy_. The demo
-data is recreated every time the backend starts, so feel free to change anything.
+Demo teacher account: `demo@smartteach.vn` / `DEMO_PASSWORD_HERE`. The demo data is
+recreated every time the backend starts, so feel free to change anything.
 
-> The demo runs on free plans: the first request after a quiet period can take about a
-> minute while the backend and the database wake up.
+> The demo runs on free plans. The backend sleeps after 15 idle minutes, so the first request
+> after a quiet period can take 2–3 minutes while the backend and the database wake up; after
+> that it responds normally.
 
 ## Screenshots
 
