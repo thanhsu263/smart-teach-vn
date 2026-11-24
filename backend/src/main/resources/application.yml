@@ -64,3 +64,8 @@ app:
     # Used only with the "demo" profile (SPRING_PROFILES_ACTIVE=demo).
     email: ${DEMO_EMAIL:demo@smartteach.vn}
     password: ${DEMO_PASSWORD:}
+  keep-alive:
+    # Base URL the keep-alive job pings while an admin has it switched on.
+    # Render sets RENDER_EXTERNAL_URL itself; empty locally, so the job does nothing.
+    url: ${KEEP_ALIVE_URL:${RENDER_EXTERNAL_URL:}}
+    interval-minutes: 10

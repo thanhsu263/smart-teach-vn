@@ -1,4 +1,5 @@
 import { createBrowserRouter, Navigate, RouterProvider } from 'react-router'
+import { AdminPage } from './admin/AdminPage'
 import { AssignmentDetailPage } from './assignments/AssignmentDetailPage'
 import { AssignmentEditorPage } from './assignments/AssignmentEditorPage'
 import { AssignmentsPage } from './assignments/AssignmentsPage'
@@ -39,6 +40,7 @@ const router = createBrowserRouter([
           { path: '/assignments/new', element: <AssignmentEditorPage /> },
           { path: '/assignments/:id', element: <AssignmentDetailPage /> },
           { path: '/assignments/:id/edit', element: <AssignmentEditorPage /> },
+          { path: '/admin', element: <AdminPage /> },
         ],
       },
       // Full screen for the projector, without the app menu.

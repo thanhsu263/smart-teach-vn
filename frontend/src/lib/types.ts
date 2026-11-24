@@ -243,3 +243,12 @@ export interface LiveMe {
   score: number
   answered: boolean
 }
+
+export interface KeepAliveStatus {
+  enabled: boolean
+  /** null when the backend has no public URL to ping (local dev). */
+  targetUrl: string | null
+  intervalMinutes: number
+  lastPingAt: string | null
+  lastPingOk: boolean | null
+}

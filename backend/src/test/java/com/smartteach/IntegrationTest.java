@@ -4,6 +4,10 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.jayway.jsonpath.JsonPath;
+import com.smartteach.user.entity.Role;
+import com.smartteach.user.entity.User;
+import com.smartteach.user.repository.UserRepository;
+import java.time.Instant;
 import java.util.UUID;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -11,6 +15,7 @@ import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.ResultActions;
@@ -30,6 +35,12 @@ public abstract class IntegrationTest {
     @Autowired
     protected MockMvc mvc;
 
+    @Autowired
+    private UserRepository userRepository;
+
+    @Autowired
+    private PasswordEncoder passwordEncoder;
+
     /** Registers a new teacher with a unique email and returns an {@code Authorization} header value. */
     protected String signUpTeacher() throws Exception {
         String body = """
@@ -37,6 +48,18 @@ public abstract class IntegrationTest {
                 .formatted(UUID.randomUUID());
         String json = mvc.perform(post("/api/auth/register").contentType(MediaType.APPLICATION_JSON).content(body))
                 .andExpect(status().isCreated())
+                .andReturn().getResponse().getContentAsString();
+        return "Bearer " + JsonPath.read(json, "$.accessToken");
+    }
+
+    /** Saves a user with the given role (registration only creates teachers), signs in, returns the header. */
+    protected String signInAs(Role role) throws Exception {
+        String email = "%s-%s@example.com".formatted(role.name().toLowerCase(), UUID.randomUUID());
+        userRepository.save(new User(email, passwordEncoder.encode("Secret123!"), "Test " + role, role, Instant.now()));
+        String body = """
+                {"email":"%s","password":"Secret123!"}""".formatted(email);
+        String json = mvc.perform(post("/api/auth/login").contentType(MediaType.APPLICATION_JSON).content(body))
+                .andExpect(status().isOk())
                 .andReturn().getResponse().getContentAsString();
         return "Bearer " + JsonPath.read(json, "$.accessToken");
     }
