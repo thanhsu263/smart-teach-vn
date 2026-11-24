@@ -8,8 +8,8 @@ spring:
       - optional:file:.env[.properties]
       - optional:file:../.env[.properties]
   datasource:
-    url: ${DB_URL:jdbc:sqlserver://localhost:${DB_PORT:14333};databaseName=smartteach;encrypt=true;trustServerCertificate=true}
-    username: ${DB_USERNAME:sa}
+    url: ${DB_URL:jdbc:postgresql://localhost:${DB_PORT:5432}/smartteach}
+    username: ${DB_USERNAME:smartteach}
     password: ${DB_PASSWORD:}
   jpa:
     open-in-view: false
@@ -19,10 +19,6 @@ spring:
       hibernate:
         jdbc:
           time_zone: UTC
-        # Columns are NVARCHAR / DATETIME2; tell Hibernate so schema validation matches.
-        use_nationalized_character_data: true
-        type:
-          preferred_instant_jdbc_type: TIMESTAMP
   flyway:
     locations: classpath:db/migration
   data:

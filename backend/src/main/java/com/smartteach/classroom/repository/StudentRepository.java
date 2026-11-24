@@ -30,13 +30,7 @@ public interface StudentRepository extends JpaRepository<Student, Long> {
     @Modifying(flushAutomatically = true)
     @Query(value = """
             UPDATE attempts SET token_hash = NULL, token_expires_at = NULL,
-                status = CASE WHEN status = N'in_progress' THEN N'invalidated' ELSE status END
+                status = CASE WHEN status = 'in_progress' THEN 'invalidated' ELSE status END
             WHERE student_id = :studentId""", nativeQuery = true)
     void revokeAttemptsOf(Long studentId);
-
-    // attempts.student_id has no ON DELETE CASCADE (SQL Server forbids the second cascade path),
-    // so a student's attempts are removed first. attempt_answers cascade from attempts.
-    @Modifying(flushAutomatically = true)
-    @Query(value = "DELETE FROM attempts WHERE student_id = :studentId", nativeQuery = true)
-    void deleteAttemptsOf(Long studentId);
 }

@@ -29,7 +29,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.web.servlet.ResultActions;
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
 
-/** Assign -> students answer with their codes -> submit and grade -> analytics, on a real SQL Server. */
+/** Assign -> students answer with their codes -> submit and grade -> analytics, on a real PostgreSQL. */
 class AssignmentFlowIntegrationTest extends IntegrationTest {
 
     /** Correct answers: 0, 0, [0, 2], "Phan Xi Păng" (accents ignored). */
@@ -297,7 +297,7 @@ class AssignmentFlowIntegrationTest extends IntegrationTest {
         Started old = start(code, s.codes.get(0));
         save(old, 0, "0");
         Started recent = start(code, s.codes.get(1));
-        jdbc.update("UPDATE attempts SET started_at = DATEADD(day, -91, SYSUTCDATETIME()) WHERE id = ?", old.id);
+        jdbc.update("UPDATE attempts SET started_at = now() - interval '91 days' WHERE id = ?", old.id);
 
         assertThat(retentionJob.deleteOldAttempts()).isGreaterThanOrEqualTo(1);
 

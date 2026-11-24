@@ -241,7 +241,7 @@ class ClassroomIntegrationTest extends IntegrationTest {
     private long insertAssignment(long classId) {
         Long ownerId = jdbc.queryForObject("SELECT owner_id FROM classes WHERE id = ?", Long.class, classId);
         String code = String.format("%010X", System.nanoTime() & 0xFFFFFFFFFFL);
-        jdbc.update("INSERT INTO assignments (owner_id, class_id, title, public_code) VALUES (?, ?, N'Bài 1', ?)",
+        jdbc.update("INSERT INTO assignments (owner_id, class_id, title, public_code) VALUES (?, ?, 'Bài 1', ?)",
                 ownerId, classId, code);
         return jdbc.queryForObject("SELECT id FROM assignments WHERE public_code = ?", Long.class, code);
     }
@@ -250,7 +250,7 @@ class ClassroomIntegrationTest extends IntegrationTest {
         jdbc.update("INSERT INTO attempts (assignment_id, student_id) VALUES (?, ?)", assignmentId, studentId);
         Long attemptId = jdbc.queryForObject(
                 "SELECT id FROM attempts WHERE assignment_id = ? AND student_id = ?", Long.class, assignmentId, studentId);
-        jdbc.update("INSERT INTO attempt_answers (attempt_id, position, answer) VALUES (?, 0, N'A')", attemptId);
+        jdbc.update("INSERT INTO attempt_answers (attempt_id, position, answer) VALUES (?, 0, 'A')", attemptId);
     }
 
     private int countAttempts(long assignmentId) {

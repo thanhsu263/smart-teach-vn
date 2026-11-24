@@ -85,9 +85,8 @@ public class QuizService {
 
     @Transactional
     public void delete(Long ownerId, Long quizId) {
-        quizRepository.detachAssignments(quizId, ownerId);
         if (quizRepository.deleteOwned(quizId, ownerId) == 0) {
-            throw quizNotFound();  // rolls back the detach as well
+            throw quizNotFound();
         }
     }
 

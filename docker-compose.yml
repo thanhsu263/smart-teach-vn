@@ -2,40 +2,23 @@ name: smartteach
 
 services:
   db:
-    image: mcr.microsoft.com/mssql/server:2022-latest
+    image: postgres:18-alpine
     environment:
-      ACCEPT_EULA: "Y"
-      MSSQL_SA_PASSWORD: ${MSSQL_SA_PASSWORD:?Set MSSQL_SA_PASSWORD in .env}
-      MSSQL_PID: Developer
+      # POSTGRES_DB makes the image create the app database on first start; Flyway creates the tables.
+      POSTGRES_DB: smartteach
+      POSTGRES_USER: smartteach
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
     ports:
-      # Host port defaults to 14333 so it does not clash with a locally installed SQL Server on 1433.
-      - "127.0.0.1:${DB_PORT:-14333}:1433"
+      - "127.0.0.1:${DB_PORT:-5432}:5432"
     volumes:
-      - mssql-data:/var/opt/mssql
+      # PostgreSQL 18 images keep data in a versioned folder under /var/lib/postgresql.
+      - pg-data:/var/lib/postgresql
     healthcheck:
-      test: ["CMD-SHELL", "/opt/mssql-tools18/bin/sqlcmd -C -S localhost -U sa -P \"$$MSSQL_SA_PASSWORD\" -Q 'SELECT 1' -b -o /dev/null"]
+      test: ["CMD-SHELL", "pg_isready -U smartteach -d smartteach"]
       interval: 5s
       timeout: 5s
-      retries: 30
-      start_period: 10s
-
-  # One-shot job: creates the app database. Flyway (run by the backend) creates the tables.
-  # The collation is set per database: setting MSSQL_COLLATION server-wide breaks sp_getapplock,
-  # which Flyway needs, on the Linux image.
-  db-init:
-    image: mcr.microsoft.com/mssql/server:2022-latest
-    depends_on:
-      db:
-        condition: service_healthy
-    environment:
-      MSSQL_SA_PASSWORD: ${MSSQL_SA_PASSWORD}
-    entrypoint:
-      - /bin/sh
-      - -c
-      - >-
-        /opt/mssql-tools18/bin/sqlcmd -C -S db -U sa -P "$$MSSQL_SA_PASSWORD" -b
-        -Q "IF DB_ID('smartteach') IS NULL CREATE DATABASE smartteach COLLATE Vietnamese_100_CI_AS"
-    restart: "no"
+      retries: 20
+      start_period: 5s
 
   # Backend in a container, with demo data. Started only with: docker compose --profile app up -d --build
   # (plain `docker compose up -d` still starts just the database, for running the backend from the IDE).
@@ -43,12 +26,12 @@ services:
     profiles: [app]
     build: ./backend
     depends_on:
-      db-init:
-        condition: service_completed_successfully
+      db:
+        condition: service_healthy
     environment:
-      DB_URL: jdbc:sqlserver://db:1433;databaseName=smartteach;encrypt=true;trustServerCertificate=true
-      DB_USERNAME: sa
-      DB_PASSWORD: ${MSSQL_SA_PASSWORD}
+      DB_URL: jdbc:postgresql://db:5432/smartteach
+      DB_USERNAME: smartteach
+      DB_PASSWORD: ${POSTGRES_PASSWORD}
       JWT_SECRET: ${JWT_SECRET:-}
       CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-http://localhost:5173}
       SPRING_PROFILES_ACTIVE: demo
@@ -58,4 +41,4 @@ services:
       - "127.0.0.1:${SERVER_PORT:-8080}:8080"
 
 volumes:
-  mssql-data:
+  pg-data:

@@ -30,14 +30,11 @@ public interface QuizRepository extends JpaRepository<Quiz, Long> {
             countQuery = "select count(q) from Quiz q where q.ownerId = :ownerId")
     Page<QuizSummaryResponse> findSummaries(Long ownerId, Pageable pageable);
 
-    /** Questions, options and accepted answers go with it (ON DELETE CASCADE). */
+    /**
+     * Questions, options and accepted answers go with it (ON DELETE CASCADE). Assignments keep their
+     * snapshot of the quiz and only lose the link to it (ON DELETE SET NULL).
+     */
     @Modifying
     @Query("delete from Quiz q where q.id = :id and q.ownerId = :ownerId")
     int deleteOwned(Long id, Long ownerId);
-
-    /** Assignments keep their snapshot of the quiz, so they only lose the link to it. */
-    @Modifying
-    @Query(value = "UPDATE assignments SET quiz_id = NULL WHERE quiz_id = :quizId AND owner_id = :ownerId",
-            nativeQuery = true)
-    void detachAssignments(Long quizId, Long ownerId);
 }

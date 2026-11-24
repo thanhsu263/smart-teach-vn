@@ -79,9 +79,8 @@ public class StudentService {
 
     @Transactional
     public void delete(Long ownerId, Long studentId) {
-        Student student = findOwned(ownerId, studentId);
-        studentRepository.deleteAttemptsOf(studentId);
-        studentRepository.delete(student);
+        // Their attempts and answers go with them (ON DELETE CASCADE).
+        studentRepository.delete(findOwned(ownerId, studentId));
     }
 
     /**
