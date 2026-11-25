@@ -3,7 +3,9 @@ import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tansta
 import { useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { Link } from 'react-router'
-import { FormError } from '../components/form'
+import { Icon } from '../components/Icon'
+import { PageHeader, Pagination } from '../components/page'
+import { EmptyState, QueryState } from '../components/states'
 import { button, card, input } from '../components/ui'
 import { problemOf } from '../lib/api'
 import { classApi, classKeys } from './api'
@@ -19,59 +21,46 @@ export function ClassesPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-wrap items-end justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold text-slate-900">Lớp học</h1>
-          <p className="text-sm text-slate-500">Tối đa 20 lớp, mỗi lớp tối đa 100 học sinh.</p>
-        </div>
-        <CreateClassForm onCreated={() => setPage(0)} />
-      </div>
+      <PageHeader
+        title="Lớp học"
+        description="Tối đa 20 lớp, mỗi lớp tối đa 100 học sinh."
+        actions={<CreateClassForm onCreated={() => setPage(0)} />}
+      />
 
-      {classes.isPending && <p className="text-slate-500">Đang tải…</p>}
-      {classes.isError && <FormError message="Không tải được danh sách lớp." />}
-      {classes.data?.totalElements === 0 && (
-        <div className={`${card} text-center text-slate-500`}>Chưa có lớp nào. Tạo lớp đầu tiên ở trên.</div>
-      )}
-
-      {classes.data && classes.data.content.length > 0 && (
-        <ul className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {classes.data.content.map((c) => (
-            <li key={c.id}>
-              <Link
-                to={`/classes/${c.id}`}
-                className={`${card} block transition hover:ring-2 hover:ring-blue-300`}
-              >
-                <p className="truncate text-lg font-semibold text-slate-900">{c.name}</p>
-                <p className="mt-1 text-sm text-slate-500">{c.studentCount} học sinh</p>
-              </Link>
-            </li>
-          ))}
-        </ul>
-      )}
-
-      {classes.data && classes.data.totalPages > 1 && (
-        <div className="flex items-center justify-center gap-3 text-sm">
-          <button
-            type="button"
-            className={button('secondary')}
-            disabled={page === 0}
-            onClick={() => setPage((p) => p - 1)}
-          >
-            Trước
-          </button>
-          <span className="text-slate-600">
-            Trang {page + 1} / {classes.data.totalPages}
-          </span>
-          <button
-            type="button"
-            className={button('secondary')}
-            disabled={page + 1 >= classes.data.totalPages}
-            onClick={() => setPage((p) => p + 1)}
-          >
-            Sau
-          </button>
-        </div>
-      )}
+      <QueryState
+        query={classes}
+        error="Không tải được danh sách lớp."
+        isEmpty={(data) => data.totalElements === 0}
+        empty={
+          <EmptyState
+            icon="classes"
+            title="Chưa có lớp nào"
+            description="Nhập tên lớp ở ô phía trên, ví dụ 10A1, rồi bấm “Tạo lớp”. Sau đó thêm học sinh để cấp mã làm bài."
+          />
+        }
+      >
+        {(data) => (
+          <>
+            <ul className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+              {data.content.map((c) => (
+                <li key={c.id}>
+                  <Link
+                    to={`/classes/${c.id}`}
+                    className={`${card} block transition-shadow hover:border-primary hover:shadow-raised`}
+                  >
+                    <p className="truncate text-heading text-ink">{c.name}</p>
+                    <p className="mt-2 flex items-center gap-2 text-sm text-ink-muted">
+                      <Icon name="users" className="size-4" />
+                      {c.studentCount} học sinh
+                    </p>
+                  </Link>
+                </li>
+              ))}
+            </ul>
+            <Pagination page={page} totalPages={data.totalPages} onChange={setPage} />
+          </>
+        )}
+      </QueryState>
     </div>
   )
 }
@@ -100,20 +89,26 @@ function CreateClassForm({ onCreated }: { onCreated: () => void }) {
       : undefined)
 
   return (
-    <form className="w-full max-w-sm space-y-2" noValidate onSubmit={handleSubmit((v) => create.mutate(v))}>
+    <form className="w-full space-y-1.5 sm:w-96" noValidate onSubmit={handleSubmit((v) => create.mutate(v))}>
       <div className="flex gap-2">
         <input
           aria-label="Tên lớp mới"
           placeholder="Tên lớp mới, ví dụ 10A1"
           aria-invalid={error ? true : undefined}
+          aria-describedby={error ? 'new-class-error' : undefined}
           className={input}
           {...register('name')}
         />
-        <button type="submit" className={`${button('primary')} shrink-0`} disabled={create.isPending}>
+        <button type="submit" className={button('primary')} disabled={create.isPending}>
+          <Icon name="plus" />
           Tạo lớp
         </button>
       </div>
-      {error && <p className="text-sm text-red-600">{error}</p>}
+      {error && (
+        <p id="new-class-error" className="text-sm text-danger">
+          {error}
+        </p>
+      )}
     </form>
   )
 }

@@ -1,9 +1,12 @@
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import type { ReactNode } from 'react'
 import { useForm } from 'react-hook-form'
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router'
-import { FormError } from '../components/form'
-import { button, card, input, select } from '../components/ui'
+import { Field, FormError } from '../components/form'
+import { PageHeader } from '../components/page'
+import { EmptyState, ErrorState, Skeleton } from '../components/states'
+import { button, card, label, link, muted, select, textarea } from '../components/ui'
 import { problemOf } from '../lib/api'
 import type { Assignment } from '../lib/types'
 import { assignmentApi, assignmentKeys } from './api'
@@ -20,18 +23,30 @@ export function AssignmentEditorPage() {
   })
 
   if (id === null) return <EditorForm />
-  if (assignment.isPending) return <p className="text-slate-500">Đang tải…</p>
-  if (assignment.isError) {
+  if (assignment.isPending) {
     return (
-      <div className={`${card} space-y-3`}>
-        <p className="text-slate-700">
-          {problemOf(assignment.error)?.status === 404 ? 'Không tìm thấy bài tập này.' : 'Không tải được bài tập.'}
-        </p>
-        <Link to="/assignments" className="text-sm text-blue-600 hover:underline">
-          ← Về danh sách bài tập
-        </Link>
+      <div role="status" aria-label="Đang tải" className="space-y-4">
+        <Skeleton className="h-9 w-56" />
+        <Skeleton className="h-96 w-full" />
       </div>
     )
+  }
+  if (assignment.isError) {
+    if (problemOf(assignment.error)?.status === 404) {
+      return (
+        <EmptyState
+          icon="assignment"
+          title="Không tìm thấy bài tập này"
+          description="Bài tập có thể đã bị xoá, hoặc đường dẫn không đúng."
+          action={
+            <Link to="/assignments" className={button('secondary', 'sm')}>
+              Về danh sách bài tập
+            </Link>
+          }
+        />
+      )
+    }
+    return <ErrorState message="Không tải được bài tập." onRetry={() => void assignment.refetch()} />
   }
   return <EditorForm assignment={assignment.data} />
 }
@@ -77,115 +92,143 @@ function EditorForm({ assignment }: { assignment?: Assignment }) {
           ? 'Lớp hoặc quiz không còn tồn tại.'
           : 'Không lưu được bài tập.'
 
-  const back = assignment ? `/assignments/${assignment.id}` : '/assignments'
+  const back = assignment
+    ? { to: `/assignments/${assignment.id}`, label: assignment.title }
+    : { to: '/assignments', label: 'Bài tập' }
 
   if (closed) {
     return (
-      <div className={`${card} space-y-3`}>
-        <p className="text-slate-700">Bài tập đã đóng, không sửa được nữa.</p>
-        <Link to={back} className="text-sm text-blue-600 hover:underline">
-          ← Quay lại
-        </Link>
-      </div>
+      <EmptyState
+        icon="assignment"
+        title="Bài tập đã đóng"
+        description="Bài tập đã đóng nên không sửa được nữa."
+        action={
+          <Link to={back.to} className={button('secondary', 'sm')}>
+            Quay lại
+          </Link>
+        }
+      />
     )
   }
 
   return (
     <form onSubmit={handleSubmit((form) => save.mutate(form))} className="space-y-6" noValidate>
-      <Link to={back} className="text-sm text-blue-600 hover:underline">
-        ← Quay lại
-      </Link>
-      <h1 className="text-2xl font-bold text-slate-900">{assignment ? 'Sửa bài tập' : 'Giao bài tập'}</h1>
+      <PageHeader back={back} title={assignment ? 'Sửa bài tập' : 'Giao bài tập'} />
 
-      <section className={`${card} space-y-4`}>
+      <section className={`${card} space-y-5`}>
         {published ? (
           // Not registered: the form keeps the default class and quiz ids, which cannot change now.
-          <p className="text-sm text-slate-600">
+          <p className="rounded-sm bg-primary-tint px-3 py-2 text-sm text-ink">
             Lớp <strong>{assignment?.className}</strong> · Đã giao bài nên không đổi được lớp và quiz; vẫn sửa được hạn
             nộp.
           </p>
         ) : (
-        <div className="grid gap-4 sm:grid-cols-2">
-          <div className="space-y-1">
-            <label htmlFor="classId" className="block text-sm font-medium text-slate-700">
-              Lớp
-            </label>
-            <select id="classId" className={`${select} w-full`} {...register('classId')}>
-              <option value="">— Chọn lớp —</option>
-              {classes.data?.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.name} ({c.studentCount} HS)
-                </option>
-              ))}
-            </select>
-            {errors.classId && <p className="text-sm text-red-600">{errors.classId.message}</p>}
+          <div className="grid gap-4 sm:grid-cols-2">
+            <SelectField
+              id="classId"
+              label="Lớp"
+              error={errors.classId?.message}
+              hint={
+                classes.data?.length === 0 && (
+                  <>
+                    Chưa có lớp nào.{' '}
+                    <Link to="/classes" className={link}>
+                      Tạo lớp trước
+                    </Link>
+                  </>
+                )
+              }
+            >
+              <select
+                id="classId"
+                className={`${select} w-full`}
+                aria-invalid={errors.classId ? true : undefined}
+                {...register('classId')}
+              >
+                <option value="">— Chọn lớp —</option>
+                {classes.data?.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.name} ({c.studentCount} HS)
+                  </option>
+                ))}
+              </select>
+            </SelectField>
+            <SelectField
+              id="quizId"
+              label="Quiz"
+              error={errors.quizId?.message}
+              hint={
+                quizzes.data?.length === 0 && (
+                  <>
+                    Chưa có quiz nào.{' '}
+                    <Link to="/quizzes/new" className={link}>
+                      Soạn quiz trước
+                    </Link>
+                  </>
+                )
+              }
+            >
+              <select
+                id="quizId"
+                className={`${select} w-full`}
+                aria-invalid={errors.quizId ? true : undefined}
+                {...register('quizId')}
+              >
+                <option value="">— Chọn quiz —</option>
+                {quizzes.data?.map((q) => (
+                  <option key={q.id} value={q.id}>
+                    {q.title} ({q.questionCount} câu)
+                  </option>
+                ))}
+              </select>
+            </SelectField>
           </div>
-          <div className="space-y-1">
-            <label htmlFor="quizId" className="block text-sm font-medium text-slate-700">
-              Quiz
-            </label>
-            <select id="quizId" className={`${select} w-full`} {...register('quizId')}>
-              <option value="">— Chọn quiz —</option>
-              {quizzes.data?.map((q) => (
-                <option key={q.id} value={q.id}>
-                  {q.title} ({q.questionCount} câu)
-                </option>
-              ))}
-            </select>
-            {errors.quizId && <p className="text-sm text-red-600">{errors.quizId.message}</p>}
-          </div>
-        </div>
         )}
 
-        <div className="space-y-1">
-          <label htmlFor="title" className="block text-sm font-medium text-slate-700">
-            Tiêu đề
-          </label>
-          <input id="title" className={input} aria-invalid={errors.title ? true : undefined} {...register('title')} />
-          {errors.title && <p className="text-sm text-red-600">{errors.title.message}</p>}
-        </div>
+        <Field id="title" label="Tiêu đề" error={errors.title?.message} {...register('title')} />
 
-        <div className="space-y-1">
-          <label htmlFor="description" className="block text-sm font-medium text-slate-700">
+        <div className="space-y-1.5">
+          <label htmlFor="description" className={label}>
             Hướng dẫn cho học sinh (không bắt buộc)
           </label>
           <textarea
             id="description"
             rows={3}
-            className={input}
+            className={textarea}
             aria-invalid={errors.description ? true : undefined}
+            aria-describedby={errors.description ? 'description-error' : undefined}
             {...register('description')}
           />
-          {errors.description && <p className="text-sm text-red-600">{errors.description.message}</p>}
+          {errors.description && (
+            <p id="description-error" className="text-sm text-danger">
+              {errors.description.message}
+            </p>
+          )}
         </div>
 
         <div className="grid gap-4 sm:grid-cols-2">
-          <div className="space-y-1">
-            <label htmlFor="opensAt" className="block text-sm font-medium text-slate-700">
-              Mở lúc (trống = mở ngay khi giao)
-            </label>
-            <input id="opensAt" type="datetime-local" className={input} {...register('opensAt')} />
-          </div>
-          <div className="space-y-1">
-            <label htmlFor="dueAt" className="block text-sm font-medium text-slate-700">
-              Hạn nộp (trống = không có hạn)
-            </label>
-            <input
-              id="dueAt"
-              type="datetime-local"
-              className={input}
-              aria-invalid={errors.dueAt ? true : undefined}
-              {...register('dueAt')}
-            />
-            {errors.dueAt && <p className="text-sm text-red-600">{errors.dueAt.message}</p>}
-          </div>
+          <Field
+            id="opensAt"
+            type="datetime-local"
+            label="Mở lúc"
+            hint="Để trống: mở ngay khi giao."
+            {...register('opensAt')}
+          />
+          <Field
+            id="dueAt"
+            type="datetime-local"
+            label="Hạn nộp"
+            hint="Để trống: không có hạn."
+            error={errors.dueAt?.message}
+            {...register('dueAt')}
+          />
         </div>
 
         <fieldset className="space-y-2">
-          <legend className="text-sm font-medium text-slate-700">Cho học sinh xem điểm và đáp án</legend>
+          <legend className={`${label} mb-2`}>Cho học sinh xem điểm và đáp án</legend>
           {(['after_close', 'immediate'] as const).map((policy) => (
-            <label key={policy} className="flex items-center gap-2 text-sm text-slate-700">
-              <input type="radio" value={policy} {...register('revealPolicy')} />
+            <label key={policy} className="flex min-h-11 items-center gap-3 text-ink">
+              <input type="radio" className="size-5 accent-primary" value={policy} {...register('revealPolicy')} />
               {REVEAL_LABELS[policy]}
             </label>
           ))}
@@ -193,19 +236,33 @@ function EditorForm({ assignment }: { assignment?: Assignment }) {
       </section>
 
       <FormError message={saveError} />
-      <div className="flex gap-2">
+      <div className="flex flex-wrap gap-2">
         <button type="submit" className={button('primary')} disabled={save.isPending}>
           {save.isPending ? 'Đang lưu…' : assignment ? 'Lưu' : 'Tạo bản nháp'}
         </button>
-        <Link to={back} className={button('secondary')}>
+        <Link to={back.to} className={button('secondary')}>
           Huỷ
         </Link>
       </div>
       {!assignment && (
-        <p className="text-sm text-slate-500">
+        <p className={muted}>
           Bản nháp chưa hiện với học sinh. Bấm “Giao bài” ở trang tiếp theo để chốt câu hỏi và lấy mã bài.
         </p>
       )}
     </form>
+  )
+}
+
+/** Label, a <select> passed as children, and an error or hint under it. */
+function SelectField(props: { id: string; label: string; error?: string; hint?: ReactNode; children: ReactNode }) {
+  const { id, error, hint, children } = props
+  return (
+    <div className="space-y-1.5">
+      <label htmlFor={id} className={label}>
+        {props.label}
+      </label>
+      {children}
+      {error ? <p className="text-sm text-danger">{error}</p> : hint && <p className={muted}>{hint}</p>}
+    </div>
   )
 }

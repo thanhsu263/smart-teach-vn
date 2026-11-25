@@ -1,8 +1,12 @@
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
 import { Link, useNavigate } from 'react-router'
+import { useConfirm } from '../components/confirm-context'
 import { FormError } from '../components/form'
-import { button, card } from '../components/ui'
+import { Icon } from '../components/Icon'
+import { PageHeader, Pagination } from '../components/page'
+import { EmptyState, QueryState } from '../components/states'
+import { button, card, muted } from '../components/ui'
 import { problemOf } from '../lib/api'
 import type { QuizSummary } from '../lib/types'
 import { hostApi } from '../live/api'
@@ -19,63 +23,52 @@ export function QuizzesPage() {
     placeholderData: keepPreviousData,
   })
 
+  const newQuiz = (
+    <Link to="/quizzes/new" className={button('primary')}>
+      <Icon name="plus" />
+      Tạo quiz
+    </Link>
+  )
+
   return (
     <div className="space-y-6">
-      <div className="flex flex-wrap items-end justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold text-slate-900">Quiz</h1>
-          <p className="text-sm text-slate-500">
-            Tối đa {MAX_QUIZZES} quiz, mỗi quiz tối đa 50 câu hỏi.
-          </p>
-        </div>
-        <Link to="/quizzes/new" className={button('primary')}>
-          Tạo quiz
-        </Link>
-      </div>
+      <PageHeader
+        title="Quiz"
+        description={`Tối đa ${MAX_QUIZZES} quiz, mỗi quiz tối đa 50 câu hỏi.`}
+        actions={newQuiz}
+      />
 
-      {quizzes.isPending && <p className="text-slate-500">Đang tải…</p>}
-      {quizzes.isError && <FormError message="Không tải được danh sách quiz." />}
-      {quizzes.data?.totalElements === 0 && (
-        <div className={`${card} text-center text-slate-500`}>Chưa có quiz nào. Bấm “Tạo quiz” để bắt đầu.</div>
-      )}
-
-      {quizzes.data && quizzes.data.content.length > 0 && (
-        <ul className="space-y-3">
-          {quizzes.data.content.map((quiz) => (
-            <QuizRow key={quiz.id} quiz={quiz} onCopied={() => setPage(0)} />
-          ))}
-        </ul>
-      )}
-
-      {quizzes.data && quizzes.data.totalPages > 1 && (
-        <div className="flex items-center justify-center gap-3 text-sm">
-          <button
-            type="button"
-            className={button('secondary')}
-            disabled={page === 0}
-            onClick={() => setPage((p) => p - 1)}
-          >
-            Trước
-          </button>
-          <span className="text-slate-600">
-            Trang {page + 1} / {quizzes.data.totalPages}
-          </span>
-          <button
-            type="button"
-            className={button('secondary')}
-            disabled={page + 1 >= quizzes.data.totalPages}
-            onClick={() => setPage((p) => p + 1)}
-          >
-            Sau
-          </button>
-        </div>
-      )}
+      <QueryState
+        query={quizzes}
+        error="Không tải được danh sách quiz."
+        isEmpty={(data) => data.totalElements === 0}
+        empty={
+          <EmptyState
+            icon="quiz"
+            title="Chưa có quiz nào"
+            description="Soạn bộ câu hỏi một lần, rồi giao làm bài tập cho lớp hoặc chơi trực tiếp bằng mã PIN."
+            action={newQuiz}
+          />
+        }
+      >
+        {(data) => (
+          <>
+            <ul className="space-y-3">
+              {data.content.map((quiz) => (
+                <QuizRow key={quiz.id} quiz={quiz} onCopied={() => setPage(0)} />
+              ))}
+            </ul>
+            <Pagination page={page} totalPages={data.totalPages} onChange={setPage} />
+          </>
+        )}
+      </QueryState>
     </div>
   )
 }
 
 function QuizRow({ quiz, onCopied }: { quiz: QuizSummary; onCopied: () => void }) {
   const queryClient = useQueryClient()
+  const confirm = useConfirm()
   const refresh = () => queryClient.invalidateQueries({ queryKey: quizKeys.all })
 
   const duplicate = useMutation({
@@ -92,6 +85,16 @@ function QuizRow({ quiz, onCopied }: { quiz: QuizSummary; onCopied: () => void }
     onSuccess: (room) => navigate(`/live/${room.pin}`),
   })
 
+  const confirmRemove = async () => {
+    const ok = await confirm({
+      title: `Xoá quiz "${quiz.title}"?`,
+      message: 'Bài tập đã giao vẫn giữ nguyên câu hỏi.',
+      confirmLabel: 'Xoá quiz',
+      danger: true,
+    })
+    if (ok) remove.mutate()
+  }
+
   const error = duplicate.error
     ? problemOf(duplicate.error)?.status === 409
       ? `Bạn đã có ${MAX_QUIZZES} quiz, hãy xoá bớt quiz cũ.`
@@ -103,30 +106,31 @@ function QuizRow({ quiz, onCopied }: { quiz: QuizSummary; onCopied: () => void }
         : undefined
 
   return (
-    <li className={`${card} space-y-2`}>
+    <li className={`${card} space-y-3`}>
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <Link to={`/quizzes/${quiz.id}`} className="min-w-0 flex-1 hover:text-blue-700">
-          <p className="truncate text-lg font-semibold text-slate-900">{quiz.title}</p>
-          <p className="text-sm text-slate-500">
+        <Link to={`/quizzes/${quiz.id}`} className="group min-w-0 flex-1 rounded-sm">
+          <p className="truncate text-heading text-ink group-hover:text-primary">{quiz.title}</p>
+          <p className={muted}>
             {quiz.questionCount} câu hỏi · Sửa lần cuối {dateFormat.format(new Date(quiz.updatedAt))}
           </p>
         </Link>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-1">
           <button
             type="button"
-            className={button('primary')}
+            className={button('primary', 'sm')}
             disabled={play.isPending || quiz.questionCount === 0}
             title="Mở phòng có mã PIN, học sinh vào chơi trên điện thoại"
             onClick={() => play.mutate()}
           >
+            <Icon name="play" className="size-4" />
             Chơi trực tiếp
           </button>
-          <Link to={`/quizzes/${quiz.id}`} className={button('secondary')}>
+          <Link to={`/quizzes/${quiz.id}`} className={button('ghost', 'sm')}>
             Sửa
           </Link>
           <button
             type="button"
-            className={button('secondary')}
+            className={button('ghost', 'sm')}
             disabled={duplicate.isPending}
             onClick={() => duplicate.mutate()}
           >
@@ -134,11 +138,9 @@ function QuizRow({ quiz, onCopied }: { quiz: QuizSummary; onCopied: () => void }
           </button>
           <button
             type="button"
-            className={button('ghostDanger')}
+            className={button('ghostDanger', 'sm')}
             disabled={remove.isPending}
-            onClick={() => {
-              if (window.confirm(`Xoá quiz "${quiz.title}"? Bài tập đã giao vẫn giữ nguyên câu hỏi.`)) remove.mutate()
-            }}
+            onClick={() => void confirmRemove()}
           >
             Xoá
           </button>

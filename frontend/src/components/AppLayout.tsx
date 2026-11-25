@@ -36,15 +36,14 @@ export function AppLayout() {
         Bỏ qua tới nội dung
       </a>
 
-      <aside
-        className={`sticky top-0 hidden h-screen flex-col border-r md:flex ${
-          admin ? 'border-ink bg-ink' : 'border-border bg-surface'
-        }`}
-      >
-        <div className="flex h-18 shrink-0 items-center px-5">
-          <Logo inverse={admin} />
+      {/* The outer box stretches to the page's full height (colour and border); the inner one stays in view. */}
+      <aside className={`hidden border-r md:block ${admin ? 'border-ink bg-ink' : 'border-border bg-surface'}`}>
+        <div className="sticky top-0 flex h-screen flex-col">
+          <div className="flex h-18 shrink-0 items-center px-5">
+            <Logo inverse={admin} />
+          </div>
+          {nav}
         </div>
-        {nav}
       </aside>
 
       <dialog
@@ -71,7 +70,7 @@ export function AppLayout() {
       </dialog>
 
       <div className="min-w-0">
-        <header className="sticky top-0 z-10 flex h-16 items-center gap-3 border-b border-border bg-surface/95 px-4 backdrop-blur-sm md:h-18 md:px-8">
+        <header className="sticky top-0 z-10 flex h-16 items-center gap-3 border-b border-border bg-surface px-4 md:h-18 md:px-8">
           <button
             type="button"
             aria-label="Mở menu"

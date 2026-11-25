@@ -33,7 +33,10 @@ export const label = 'block text-sm font-semibold text-ink'
 
 export const link = 'rounded-sm font-semibold text-primary hover:underline'
 
-export const card = 'rounded-md border border-border bg-surface p-5 shadow-card'
+/** A white box with no padding, for content that runs edge to edge (lists, tables). */
+export const panel = 'rounded-md border border-border bg-surface shadow-card'
+
+export const card = `${panel} p-5`
 
 export const muted = 'text-sm text-ink-muted'
 
