@@ -37,9 +37,9 @@ export function Field({ label, error, hint, id, ...props }: FieldProps) {
   )
 }
 
-export function Logo({ className = '' }: { className?: string }) {
+export function Logo({ inverse = false, className = '' }: { inverse?: boolean; className?: string }) {
   return (
-    <span className={`inline-flex items-center gap-2 font-bold text-brand ${className}`}>
+    <span className={`inline-flex items-center gap-2 font-bold ${inverse ? 'text-white' : 'text-brand'} ${className}`}>
       <span aria-hidden="true" className="grid size-8 place-items-center rounded-sm bg-primary text-white">
         S
       </span>
