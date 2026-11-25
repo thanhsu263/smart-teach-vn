@@ -152,6 +152,7 @@ API docs (Swagger UI): http://localhost:8080/swagger-ui.html
 | `AUTH_COOKIE_SAME_SITE` | backend | `Lax` by default; `None` when frontend and backend are on different sites |
 | `SPRING_PROFILES_ACTIVE` | backend | `demo` recreates the demo teacher and their data on every start |
 | `DEMO_EMAIL`, `DEMO_PASSWORD` | backend (demo profile) | Demo teacher account; the password must have at least 8 characters |
+| `KEEP_ALIVE_URL` | backend | Public backend URL for the keep-alive pinger; defaults to `RENDER_EXTERNAL_URL` (set by Render), empty locally |
 | `VITE_API_URL` | frontend build | Backend origin; leave empty when `/api` is proxied (dev server, Vercel) |
 | `VITE_WS_URL` | frontend build | Live quiz WebSocket, e.g. `wss://<backend>/ws`; leave empty in dev (Vite proxies `/ws`) |
 
@@ -178,6 +179,30 @@ The repository contains the configuration for a free deployment:
   the Vercel URL, and `VITE_WS_URL=wss://<render host>/ws` on Vercel for the live quiz (the
   WebSocket handshake is checked against the same allowed origins).
 
+### Keep-alive switch (admin)
+
+Render's free plan stops the backend after 15 minutes without traffic, and the next visitor
+waits 2–3 minutes for it to start again. An admin can turn on **Keep server awake** on the
+**Quản trị** page (`PUT /api/admin/keep-alive`, `ADMIN` role only). While it is on, the backend
+calls its own public URL (`RENDER_EXTERNAL_URL`) every 10 minutes; a request through Render's
+public address counts as traffic, so the instance never goes idle.
+
+- The switch is stored in the `system_settings` table, so it survives restarts and redeploys,
+  and is cached in memory, so the pinger does not query the database.
+- The pinger calls `/actuator/health/liveness`, which does not touch the database: Neon can
+  still suspend when nobody is using the app.
+- It only keeps a running server awake; it cannot wake one that is already asleep. Open the
+  site once after turning it on (or after a redeploy, if it was off).
+- Running 24/7 uses about 744 instance hours a month, inside Render's 750 free hours per
+  workspace — so keep only one free service awake.
+
+New accounts are always teachers. To make an account an admin, run this in the Neon SQL
+editor, then sign out and in again so the new token carries the role:
+
+```sql
+UPDATE users SET role = 'ADMIN' WHERE lower(email) = lower('you@example.com');
+```
+
 ## Authentication
 
 Teachers sign up and sign in with email + password (BCrypt). Public sign-up always creates a
@@ -192,6 +217,7 @@ that differ only in case.
 | `POST /api/auth/refresh` | Rotate the refresh token, return a new access token |
 | `POST /api/auth/logout` | Revoke the refresh token and clear the cookie (204) |
 | `GET /api/me` | Current user (needs `Authorization: Bearer <access token>`) |
+| `GET`/`PUT /api/admin/keep-alive` | Keep-alive switch, `ADMIN` only (403 for teachers), see [Deploy](#keep-alive-switch-admin) |
 
 How it works:
 

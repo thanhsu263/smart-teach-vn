@@ -26,6 +26,11 @@ export function AppLayout() {
               <NavLink to="/assignments" className={navClass}>
                 Bài tập
               </NavLink>
+              {user?.role === 'ADMIN' && (
+                <NavLink to="/admin" className={navClass}>
+                  Quản trị
+                </NavLink>
+              )}
             </nav>
           </div>
           <div className="flex items-center gap-4 text-sm">
