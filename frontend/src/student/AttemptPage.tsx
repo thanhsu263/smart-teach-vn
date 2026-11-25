@@ -1,8 +1,11 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { type ReactNode, useEffect, useRef, useState } from 'react'
 import { Link, Navigate, useParams } from 'react-router'
-import { FormError } from '../components/form'
-import { button, card, input } from '../components/ui'
+import { useConfirm } from '../components/confirm-context'
+import { FormError, Logo } from '../components/form'
+import { Icon } from '../components/Icon'
+import { EmptyState, ErrorState, Skeleton } from '../components/states'
+import { badge, button, card, input, muted } from '../components/ui'
 import { problemOf } from '../lib/api'
 import type { AnswerValue, AttemptResult, AttemptView } from '../lib/types'
 import { getToken, studentApi, studentKeys } from './api'
@@ -27,9 +30,9 @@ export function AttemptPage() {
 
 export function StudentShell({ children }: { children: ReactNode }) {
   return (
-    <main className="min-h-screen bg-slate-50">
-      <div className="mx-auto max-w-2xl space-y-6 p-4 sm:p-6">
-        <p className="text-sm font-semibold text-blue-600">SmartTeach</p>
+    <main className="min-h-screen">
+      <div className="mx-auto max-w-2xl space-y-5 px-4 py-5 sm:space-y-6 sm:px-6 sm:py-8">
+        <Logo />
         {children}
       </div>
     </main>
@@ -40,27 +43,49 @@ function Attempt({ id }: { id: number }) {
   const view = useQuery({ queryKey: studentKeys.attempt(id), queryFn: () => studentApi.view(id) })
   const [result, setResult] = useState<AttemptResult | null>(null)
 
-  if (view.isPending) return <p className="text-slate-500">Đang tải…</p>
+  if (view.isPending) return <SheetSkeleton />
   if (view.isError) {
-    return (
-      <div className={`${card} space-y-3`}>
-        <p className="text-slate-700">
-          {problemOf(view.error)?.status === 404
-            ? 'Phiên làm bài không còn hiệu lực (có thể thầy cô đã cấp mã mới).'
-            : 'Không tải được bài, hãy thử lại.'}
-        </p>
-        <Link to="/s" className="text-sm text-blue-600 hover:underline">
-          Nhập lại mã
-        </Link>
-      </div>
-    )
+    if (problemOf(view.error)?.status === 404) {
+      return (
+        <EmptyState
+          icon="assignment"
+          title="Phiên làm bài không còn hiệu lực"
+          description="Có thể thầy cô đã cấp mã mới cho em. Hãy nhập lại mã bài và mã học sinh."
+          action={
+            <Link to="/s" className={button('primary', 'sm')}>
+              Nhập lại mã
+            </Link>
+          }
+        />
+      )
+    }
+    return <ErrorState message="Không tải được bài, hãy thử lại." onRetry={() => void view.refetch()} />
   }
   if (result || view.data.status !== 'in_progress') return <ResultView id={id} initial={result} />
   return <AnswerSheet view={view.data} onSubmitted={setResult} />
 }
 
+function SheetSkeleton() {
+  return (
+    <div role="status" aria-label="Đang tải" className="space-y-4">
+      <div className={`${card} space-y-3`}>
+        <Skeleton className="h-7 w-3/4" />
+        <Skeleton className="h-4 w-1/2" />
+      </div>
+      {[0, 1].map((i) => (
+        <div key={i} className={`${card} space-y-3`}>
+          <Skeleton className="h-5 w-2/3" />
+          <Skeleton className="h-12" />
+          <Skeleton className="h-12" />
+        </div>
+      ))}
+    </div>
+  )
+}
+
 function AnswerSheet({ view, onSubmitted }: { view: AttemptView; onSubmitted: (result: AttemptResult) => void }) {
   const queryClient = useQueryClient()
+  const confirm = useConfirm()
   const [answers, setAnswers] = useState<Answers>(() => view.answers as Answers)
   const [status, setStatus] = useState<Record<number, SaveStatus>>({})
   const [locked, setLocked] = useState(!view.open)
@@ -116,8 +141,12 @@ function AnswerSheet({ view, onSubmitted }: { view: AttemptView; onSubmitted: (r
 
   const submit = async () => {
     const unanswered = view.questions.filter((q) => answers[q.position] == null).length
-    const question = unanswered > 0 ? `Còn ${unanswered} câu chưa trả lời. Vẫn nộp bài?` : 'Nộp bài? Sau khi nộp không sửa được nữa.'
-    if (!window.confirm(question)) return
+    const ok = await confirm({
+      title: unanswered > 0 ? `Còn ${unanswered} câu chưa trả lời. Vẫn nộp bài?` : 'Nộp bài?',
+      message: 'Sau khi nộp, em không sửa được câu trả lời nữa.',
+      confirmLabel: 'Nộp bài',
+    })
+    if (!ok) return
 
     setSubmitting(true)
     setSubmitError(undefined)
@@ -145,23 +174,23 @@ function AnswerSheet({ view, onSubmitted }: { view: AttemptView; onSubmitted: (r
   return (
     <>
       <header className={`${card} space-y-1`}>
-        <h1 className="text-2xl font-bold text-slate-900">{view.assignmentTitle}</h1>
-        <p className="text-sm text-slate-500">
+        <h1 className="text-2xl font-bold text-ink">{view.assignmentTitle}</h1>
+        <p className={muted}>
           {view.studentName}
           {view.dueAt && ` · Hạn nộp ${dateFormat.format(new Date(view.dueAt))}`}
         </p>
-        {view.description && <p className="whitespace-pre-line pt-2 text-slate-700">{view.description}</p>}
+        {view.description && <p className="pt-2 whitespace-pre-line text-ink">{view.description}</p>}
       </header>
 
       {locked && <FormError message="Bài tập chưa mở hoặc đã đóng nên không lưu được câu trả lời." />}
 
       <ol className="space-y-4">
         {view.questions.map((q) => (
-          <li key={q.position} className={`${card} space-y-3`}>
-            <div className="flex justify-between gap-3">
-              <p className="font-medium text-slate-900">
-                Câu {q.position + 1}. {q.prompt}
-              </p>
+          <li key={q.position} className={`${card} space-y-4`}>
+            <div className="flex items-start justify-between gap-3">
+              <h2 className="font-semibold text-ink">
+                <span className="text-primary">Câu {q.position + 1}.</span> {q.prompt}
+              </h2>
               <SaveBadge status={status[q.position]} />
             </div>
             <QuestionInput
@@ -174,15 +203,20 @@ function AnswerSheet({ view, onSubmitted }: { view: AttemptView; onSubmitted: (r
         ))}
       </ol>
 
-      <div className={`${card} flex flex-wrap items-center justify-between gap-3`}>
-        <p className="text-sm text-slate-600">
-          Đã trả lời {answeredCount} / {view.questions.length} câu · Câu trả lời được lưu tự động.
+      <FormError message={submitError} />
+      {/* Stays at the bottom of the screen, so progress and "Nộp bài" are in reach from any question. */}
+      <div className="sticky bottom-3 z-[5] flex flex-wrap items-center justify-between gap-3 rounded-md border border-border bg-surface p-4 shadow-raised">
+        <p className="text-sm text-ink">
+          <strong>
+            {answeredCount} / {view.questions.length}
+          </strong>{' '}
+          câu đã trả lời
+          <span className="block text-ink-muted">Câu trả lời được lưu tự động.</span>
         </p>
         <button type="button" className={button('primary')} disabled={locked || submitting} onClick={() => void submit()}>
           {submitting ? 'Đang nộp…' : 'Nộp bài'}
         </button>
       </div>
-      <FormError message={submitError} />
     </>
   )
 }
@@ -221,20 +255,21 @@ function QuestionInput({
 
   return (
     <div className="space-y-2">
-      {multi && <p className="text-xs text-slate-500">Chọn tất cả đáp án đúng.</p>}
+      {multi && <p className={muted}>Chọn tất cả đáp án đúng.</p>}
       {q.options.map((label, index) => (
         <label
           key={index}
-          className="flex cursor-pointer items-center gap-3 rounded-lg border border-slate-200 px-3 py-2 hover:bg-slate-50 has-checked:border-blue-400 has-checked:bg-blue-50"
+          className="flex min-h-12 cursor-pointer items-center gap-3 rounded-sm border border-border px-4 py-2.5 transition-colors hover:bg-page has-checked:border-primary has-checked:bg-primary-tint has-disabled:cursor-not-allowed has-disabled:opacity-60"
         >
           <input
             type={multi ? 'checkbox' : 'radio'}
             name={`q-${q.position}`}
+            className="size-5 shrink-0 accent-primary"
             disabled={disabled}
             checked={multi ? chosen.includes(index) : value === index}
             onChange={() => (multi ? toggle(index) : onChange(index))}
           />
-          <span className="text-slate-800">{label}</span>
+          <span className="text-ink">{label}</span>
         </label>
       ))}
     </div>
@@ -243,9 +278,12 @@ function QuestionInput({
 
 function SaveBadge({ status }: { status?: SaveStatus }) {
   if (!status) return null
-  const text = { saving: 'Đang lưu…', saved: 'Đã lưu', error: 'Chưa lưu được' }[status]
+  if (status === 'error') return <span className={badge('danger')}>Chưa lưu được</span>
   return (
-    <span className={`shrink-0 text-xs ${status === 'error' ? 'text-red-600' : 'text-slate-400'}`}>{text}</span>
+    <span className="inline-flex shrink-0 items-center gap-1 text-xs text-ink-muted">
+      {status === 'saved' && <Icon name="check" className="size-3.5 text-success" />}
+      {status === 'saving' ? 'Đang lưu…' : 'Đã lưu'}
+    </span>
   )
 }
 
@@ -256,42 +294,59 @@ function ResultView({ id, initial }: { id: number; initial: AttemptResult | null
     initialData: initial ?? undefined,
   })
 
-  if (result.isPending) return <p className="text-slate-500">Đang tải kết quả…</p>
-  if (result.isError) return <FormError message="Không tải được kết quả." />
+  if (result.isPending) return <SheetSkeleton />
+  if (result.isError) return <ErrorState message="Không tải được kết quả." onRetry={() => void result.refetch()} />
   const r = result.data
 
   return (
     <>
       <header className={`${card} space-y-1`}>
-        <h1 className="text-2xl font-bold text-slate-900">{r.assignmentTitle}</h1>
-        <p className="text-sm text-slate-500">
+        <h1 className="text-2xl font-bold text-ink">{r.assignmentTitle}</h1>
+        <p className={muted}>
           {r.studentName}
           {r.submittedAt && ` · Đã nộp lúc ${dateFormat.format(new Date(r.submittedAt))}`}
         </p>
-        {r.status === 'invalidated' && <p className="text-sm text-red-600">Bài làm này đã bị huỷ.</p>}
+        {r.status === 'invalidated' && <p className="text-sm font-semibold text-danger">Bài làm này đã bị huỷ.</p>}
       </header>
 
       {!r.revealed ? (
-        <div className={`${card} text-slate-700`}>
-          Em đã nộp bài. Điểm và đáp án sẽ hiện khi bài tập kết thúc – hãy mở lại link này sau.
-        </div>
+        <EmptyState
+          icon="check"
+          title="Em đã nộp bài"
+          description="Điểm và đáp án sẽ hiện khi bài tập kết thúc. Hãy mở lại link này sau."
+        />
       ) : (
         <>
           <div className={`${card} text-center`}>
-            <p className="text-sm text-slate-500">Điểm</p>
-            <p className="text-5xl font-bold text-blue-600">{r.score}</p>
-            <p className="text-sm text-slate-500">
+            <p className={muted}>Điểm</p>
+            <p className="text-display text-primary">{r.score}</p>
+            <p className={muted}>
               Đúng {r.correctCount} / {r.questionTotal} câu
             </p>
           </div>
           <ol className="space-y-3">
             {r.questions.map((q) => (
-              <li key={q.position} className={`${card} space-y-1 text-sm`}>
-                <p className="font-medium text-slate-900">
-                  {q.correct ? '✓' : '✗'} Câu {q.position + 1}. {q.prompt}
-                </p>
-                <p className={q.correct ? 'text-green-700' : 'text-red-600'}>Em trả lời: {formatAnswer(q)}</p>
-                {!q.correct && <p className="text-slate-600">Đáp án: {correctAnswer(q)}</p>}
+              <li
+                key={q.position}
+                className={`flex gap-3 rounded-md border bg-surface p-4 text-sm shadow-card ${
+                  q.correct ? 'border-success/30' : 'border-danger/30'
+                }`}
+              >
+                <span
+                  className={`grid size-7 shrink-0 place-items-center rounded-full ${
+                    q.correct ? 'bg-success/10 text-success' : 'bg-danger/10 text-danger'
+                  }`}
+                >
+                  <Icon name={q.correct ? 'check' : 'close'} className="size-4" />
+                  <span className="sr-only">{q.correct ? 'Đúng' : 'Sai'}</span>
+                </span>
+                <div className="min-w-0 space-y-1">
+                  <p className="font-semibold text-ink">
+                    Câu {q.position + 1}. {q.prompt}
+                  </p>
+                  <p className={q.correct ? 'text-success' : 'text-danger'}>Em trả lời: {formatAnswer(q)}</p>
+                  {!q.correct && <p className="text-ink">Đáp án: {correctAnswer(q)}</p>}
+                </div>
               </li>
             ))}
           </ol>
