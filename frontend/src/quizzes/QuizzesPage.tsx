@@ -28,7 +28,7 @@ export function QuizzesPage() {
             Tối đa {MAX_QUIZZES} quiz, mỗi quiz tối đa 50 câu hỏi.
           </p>
         </div>
-        <Link to="/quizzes/new" className={button.primary}>
+        <Link to="/quizzes/new" className={button('primary')}>
           Tạo quiz
         </Link>
       </div>
@@ -51,7 +51,7 @@ export function QuizzesPage() {
         <div className="flex items-center justify-center gap-3 text-sm">
           <button
             type="button"
-            className={button.secondary}
+            className={button('secondary')}
             disabled={page === 0}
             onClick={() => setPage((p) => p - 1)}
           >
@@ -62,7 +62,7 @@ export function QuizzesPage() {
           </span>
           <button
             type="button"
-            className={button.secondary}
+            className={button('secondary')}
             disabled={page + 1 >= quizzes.data.totalPages}
             onClick={() => setPage((p) => p + 1)}
           >
@@ -114,19 +114,19 @@ function QuizRow({ quiz, onCopied }: { quiz: QuizSummary; onCopied: () => void }
         <div className="flex gap-2">
           <button
             type="button"
-            className={button.primary}
+            className={button('primary')}
             disabled={play.isPending || quiz.questionCount === 0}
             title="Mở phòng có mã PIN, học sinh vào chơi trên điện thoại"
             onClick={() => play.mutate()}
           >
             Chơi trực tiếp
           </button>
-          <Link to={`/quizzes/${quiz.id}`} className={button.secondary}>
+          <Link to={`/quizzes/${quiz.id}`} className={button('secondary')}>
             Sửa
           </Link>
           <button
             type="button"
-            className={button.secondary}
+            className={button('secondary')}
             disabled={duplicate.isPending}
             onClick={() => duplicate.mutate()}
           >
@@ -134,7 +134,7 @@ function QuizRow({ quiz, onCopied }: { quiz: QuizSummary; onCopied: () => void }
           </button>
           <button
             type="button"
-            className={button.danger}
+            className={button('ghostDanger')}
             disabled={remove.isPending}
             onClick={() => {
               if (window.confirm(`Xoá quiz "${quiz.title}"? Bài tập đã giao vẫn giữ nguyên câu hỏi.`)) remove.mutate()

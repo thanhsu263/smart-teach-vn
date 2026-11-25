@@ -26,10 +26,10 @@ export function NewCodesPanel({ codes, onClose }: { codes: StudentCode[]; onClos
           </p>
         </div>
         <div className="flex gap-2">
-          <button type="button" className={button.primary} onClick={() => void copyAll()}>
+          <button type="button" className={button('primary')} onClick={() => void copyAll()}>
             {copied ? 'Đã chép' : 'Chép tất cả'}
           </button>
-          <button type="button" className={button.secondary} onClick={close}>
+          <button type="button" className={button('secondary')} onClick={close}>
             Đóng
           </button>
         </div>

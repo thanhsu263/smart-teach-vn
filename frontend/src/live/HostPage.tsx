@@ -70,7 +70,7 @@ export function HostPage() {
             <>
               <button
                 type="button"
-                className={button.danger}
+                className={button('ghostDanger')}
                 disabled={end.isPending}
                 onClick={() => window.confirm('Kết thúc trò chơi ngay bây giờ?') && end.mutate()}
               >
@@ -78,7 +78,7 @@ export function HostPage() {
               </button>
               <button
                 type="button"
-                className={`${button.primary} px-5`}
+                className={`${button('primary')} px-5`}
                 disabled={next.isPending || (s.status === 'lobby' && s.players.length === 0)}
                 onClick={() => next.mutate()}
               >
@@ -87,7 +87,7 @@ export function HostPage() {
             </>
           )}
           {s.status === 'ended' && (
-            <Link to="/quizzes" className={button.secondary}>
+            <Link to="/quizzes" className={button('secondary')}>
               Về danh sách quiz
             </Link>
           )}

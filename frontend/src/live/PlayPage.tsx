@@ -105,7 +105,7 @@ function Game({ pin, seat, onLeave }: { pin: string; seat: Seat; onLeave: () => 
       <LiveShell>
         <div className={`${card} space-y-3`}>
           <p className="text-slate-700">Phòng không còn tồn tại.</p>
-          <button type="button" className={button.secondary} onClick={onLeave}>
+          <button type="button" className={button('secondary')} onClick={onLeave}>
             Vào phòng khác
           </button>
         </div>
@@ -126,7 +126,7 @@ function Game({ pin, seat, onLeave }: { pin: string; seat: Seat; onLeave: () => 
       <LiveShell>
         <div className={`${card} space-y-3`}>
           <p className="text-slate-700">Thầy cô đã mời bạn ra khỏi phòng.</p>
-          <button type="button" className={button.secondary} onClick={onLeave}>
+          <button type="button" className={button('secondary')} onClick={onLeave}>
             Vào phòng khác
           </button>
         </div>
@@ -240,7 +240,7 @@ function AnswerPanel({
             value={text}
             onChange={(e) => setText(e.target.value)}
           />
-          <button type="submit" className={`${button.primary} w-full py-3`} disabled={disabled || !text.trim()}>
+          <button type="submit" className={`${button('primary')} w-full py-3`} disabled={disabled || !text.trim()}>
             Gửi
           </button>
         </form>
@@ -269,7 +269,7 @@ function AnswerPanel({
           </div>
           <button
             type="button"
-            className={`${button.primary} w-full py-3`}
+            className={`${button('primary')} w-full py-3`}
             disabled={disabled || chosen.length === 0}
             onClick={() => send.mutate(chosen)}
           >

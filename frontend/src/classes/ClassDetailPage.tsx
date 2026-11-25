@@ -121,13 +121,13 @@ function ClassHeader({ classroom }: { classroom: ClassItem }) {
     <div className="flex flex-wrap items-center justify-between gap-3">
       <h1 className="text-2xl font-bold text-slate-900">{classroom.name}</h1>
       <div className="flex gap-2">
-        <Link to={`/assignments?classId=${classroom.id}`} className={button.secondary}>
+        <Link to={`/assignments?classId=${classroom.id}`} className={button('secondary')}>
           Bài tập của lớp
         </Link>
-        <button type="button" className={button.secondary} onClick={() => setEditing(true)}>
+        <button type="button" className={button('secondary')} onClick={() => setEditing(true)}>
           Đổi tên
         </button>
-        <button type="button" className={button.danger} onClick={confirmDelete} disabled={remove.isPending}>
+        <button type="button" className={button('ghostDanger')} onClick={confirmDelete} disabled={remove.isPending}>
           Xoá lớp
         </button>
       </div>
@@ -182,12 +182,12 @@ function StudentRow(props: {
       </td>
       <td className="py-2">
         <div className="flex justify-end gap-1">
-          <button type="button" className={button.secondary} onClick={() => setEditing(true)}>
+          <button type="button" className={button('secondary')} onClick={() => setEditing(true)}>
             Sửa
           </button>
           <button
             type="button"
-            className={button.secondary}
+            className={button('secondary')}
             disabled={regenerate.isPending}
             onClick={() => {
               if (window.confirm(`Cấp mã mới cho ${student.name}? Mã cũ sẽ không dùng được nữa.`)) regenerate.mutate()
@@ -197,7 +197,7 @@ function StudentRow(props: {
           </button>
           <button
             type="button"
-            className={button.danger}
+            className={button('ghostDanger')}
             disabled={remove.isPending}
             onClick={() => {
               if (window.confirm(`Xoá học sinh ${student.name} và kết quả bài làm?`)) remove.mutate()
@@ -238,10 +238,10 @@ function NameEditor(props: {
     <form className="space-y-1" noValidate onSubmit={handleSubmit((v) => mutation.mutate(v))}>
       <div className="flex gap-2">
         <input aria-label={label} autoFocus className={input} aria-invalid={error ? true : undefined} {...register('name')} />
-        <button type="submit" className={`${button.primary} shrink-0`} disabled={mutation.isPending}>
+        <button type="submit" className={`${button('primary')} shrink-0`} disabled={mutation.isPending}>
           Lưu
         </button>
-        <button type="button" className={`${button.secondary} shrink-0`} onClick={onDone}>
+        <button type="button" className={`${button('secondary')} shrink-0`} onClick={onDone}>
           Huỷ
         </button>
       </div>
@@ -293,7 +293,7 @@ function AddStudentsForm(props: { classId: number; remaining: number; onAdded: (
         {...register('names')}
       />
       {error && <p className="text-sm text-red-600">{error}</p>}
-      <button type="submit" className={`${button.primary} w-full`} disabled={add.isPending || remaining <= 0}>
+      <button type="submit" className={`${button('primary')} w-full`} disabled={add.isPending || remaining <= 0}>
         Thêm và tạo mã
       </button>
     </form>

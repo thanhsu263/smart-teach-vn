@@ -90,7 +90,7 @@ function Header({ assignment: a }: { assignment: Assignment }) {
           {a.status === 'draft' && (
             <button
               type="button"
-              className={button.primary}
+              className={button('primary')}
               disabled={publish.isPending}
               onClick={() => publish.mutate()}
             >
@@ -98,14 +98,14 @@ function Header({ assignment: a }: { assignment: Assignment }) {
             </button>
           )}
           {a.status !== 'closed' && (
-            <Link to={`/assignments/${a.id}/edit`} className={button.secondary}>
+            <Link to={`/assignments/${a.id}/edit`} className={button('secondary')}>
               Sửa
             </Link>
           )}
           {a.status === 'published' && (
             <button
               type="button"
-              className={button.secondary}
+              className={button('secondary')}
               disabled={close.isPending}
               onClick={() => {
                 if (window.confirm('Đóng bài? Học sinh sẽ không làm tiếp được nữa.')) close.mutate()
@@ -116,7 +116,7 @@ function Header({ assignment: a }: { assignment: Assignment }) {
           )}
           <button
             type="button"
-            className={button.danger}
+            className={button('ghostDanger')}
             disabled={remove.isPending}
             onClick={() => {
               if (window.confirm(`Xoá bài "${a.title}" và toàn bộ bài làm của học sinh?`)) remove.mutate()
@@ -151,7 +151,7 @@ function ShareBox({ assignment: a }: { assignment: Assignment }) {
         <p className="text-sm text-slate-500">Gửi link cho học sinh; mỗi em nhập mã học sinh riêng để làm bài.</p>
         <p className="truncate font-mono text-sm text-blue-700">{link}</p>
       </div>
-      <button type="button" className={button.secondary} onClick={() => void copy()}>
+      <button type="button" className={button('secondary')} onClick={() => void copy()}>
         {copied ? 'Đã chép' : 'Chép link'}
       </button>
     </section>

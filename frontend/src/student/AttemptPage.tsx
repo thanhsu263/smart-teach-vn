@@ -178,7 +178,7 @@ function AnswerSheet({ view, onSubmitted }: { view: AttemptView; onSubmitted: (r
         <p className="text-sm text-slate-600">
           Đã trả lời {answeredCount} / {view.questions.length} câu · Câu trả lời được lưu tự động.
         </p>
-        <button type="button" className={button.primary} disabled={locked || submitting} onClick={() => void submit()}>
+        <button type="button" className={button('primary')} disabled={locked || submitting} onClick={() => void submit()}>
           {submitting ? 'Đang nộp…' : 'Nộp bài'}
         </button>
       </div>

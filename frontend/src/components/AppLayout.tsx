@@ -35,7 +35,7 @@ export function AppLayout() {
           </div>
           <div className="flex items-center gap-4 text-sm">
             <span className="text-slate-600">{user?.fullName}</span>
-            <button type="button" onClick={() => void logout()} className={button.secondary}>
+            <button type="button" onClick={() => void logout()} className={button('secondary')}>
               Đăng xuất
             </button>
           </div>

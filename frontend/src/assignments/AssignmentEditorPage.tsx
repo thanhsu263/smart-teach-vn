@@ -194,10 +194,10 @@ function EditorForm({ assignment }: { assignment?: Assignment }) {
 
       <FormError message={saveError} />
       <div className="flex gap-2">
-        <button type="submit" className={button.primary} disabled={save.isPending}>
+        <button type="submit" className={button('primary')} disabled={save.isPending}>
           {save.isPending ? 'Đang lưu…' : assignment ? 'Lưu' : 'Tạo bản nháp'}
         </button>
-        <Link to={back} className={button.secondary}>
+        <Link to={back} className={button('secondary')}>
           Huỷ
         </Link>
       </div>

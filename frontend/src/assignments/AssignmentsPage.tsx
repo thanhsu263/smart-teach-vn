@@ -51,7 +51,7 @@ export function AssignmentsPage() {
           </select>
           <Link
             to={classId ? `/assignments/new?classId=${classId}` : '/assignments/new'}
-            className={button.primary}
+            className={button('primary')}
           >
             Giao bài
           </Link>
@@ -88,7 +88,7 @@ export function AssignmentsPage() {
 
       {assignments.data && assignments.data.totalPages > 1 && (
         <div className="flex items-center justify-center gap-3 text-sm">
-          <button type="button" className={button.secondary} disabled={page === 0} onClick={() => setPage((p) => p - 1)}>
+          <button type="button" className={button('secondary')} disabled={page === 0} onClick={() => setPage((p) => p - 1)}>
             Trước
           </button>
           <span className="text-slate-600">
@@ -96,7 +96,7 @@ export function AssignmentsPage() {
           </span>
           <button
             type="button"
-            className={button.secondary}
+            className={button('secondary')}
             disabled={page + 1 >= assignments.data.totalPages}
             onClick={() => setPage((p) => p + 1)}
           >

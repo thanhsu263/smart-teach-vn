@@ -53,7 +53,7 @@ export function ClassesPage() {
         <div className="flex items-center justify-center gap-3 text-sm">
           <button
             type="button"
-            className={button.secondary}
+            className={button('secondary')}
             disabled={page === 0}
             onClick={() => setPage((p) => p - 1)}
           >
@@ -64,7 +64,7 @@ export function ClassesPage() {
           </span>
           <button
             type="button"
-            className={button.secondary}
+            className={button('secondary')}
             disabled={page + 1 >= classes.data.totalPages}
             onClick={() => setPage((p) => p + 1)}
           >
@@ -109,7 +109,7 @@ function CreateClassForm({ onCreated }: { onCreated: () => void }) {
           className={input}
           {...register('name')}
         />
-        <button type="submit" className={`${button.primary} shrink-0`} disabled={create.isPending}>
+        <button type="submit" className={`${button('primary')} shrink-0`} disabled={create.isPending}>
           Tạo lớp
         </button>
       </div>

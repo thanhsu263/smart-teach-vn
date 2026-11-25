@@ -126,7 +126,7 @@ function QuizEditor({ quiz }: { quiz?: Quiz }) {
             <span className="text-sm text-slate-500" aria-live="polite">
               {justSaved ? 'Đã lưu' : formState.isDirty ? 'Chưa lưu' : ''}
             </span>
-            <button type="submit" className={button.primary} disabled={save.isPending}>
+            <button type="submit" className={button('primary')} disabled={save.isPending}>
               {save.isPending ? 'Đang lưu…' : 'Lưu quiz'}
             </button>
           </div>
@@ -154,7 +154,7 @@ function QuizEditor({ quiz }: { quiz?: Quiz }) {
 
       <button
         type="button"
-        className={`${button.secondary} w-full border-dashed`}
+        className={`${button('secondary')} w-full border-dashed`}
         disabled={questions.fields.length >= MAX_QUESTIONS}
         onClick={() => questions.append(newQuestion())}
       >
@@ -245,7 +245,7 @@ function QuestionCard({ form, index, count, onMove, onRemove }: QuestionCardProp
         <div className="ml-auto flex gap-1">
           <button
             type="button"
-            className={button.secondary}
+            className={button('secondary')}
             aria-label={`Đưa câu ${index + 1} lên`}
             disabled={index === 0}
             onClick={() => onMove(index - 1)}
@@ -254,7 +254,7 @@ function QuestionCard({ form, index, count, onMove, onRemove }: QuestionCardProp
           </button>
           <button
             type="button"
-            className={button.secondary}
+            className={button('secondary')}
             aria-label={`Đưa câu ${index + 1} xuống`}
             disabled={index === count - 1}
             onClick={() => onMove(index + 1)}
@@ -263,7 +263,7 @@ function QuestionCard({ form, index, count, onMove, onRemove }: QuestionCardProp
           </button>
           <button
             type="button"
-            className={button.danger}
+            className={button('ghostDanger')}
             onClick={() => {
               if (!getValues(`questions.${index}.prompt`).trim() || window.confirm(`Xoá câu ${index + 1}?`)) onRemove()
             }}
@@ -311,7 +311,7 @@ function QuestionCard({ form, index, count, onMove, onRemove }: QuestionCardProp
                 {kind !== 'true_false' && (
                   <button
                     type="button"
-                    className={`${button.secondary} shrink-0`}
+                    className={`${button('secondary')} shrink-0`}
                     aria-label={`Xoá lựa chọn ${j + 1}`}
                     disabled={options.fields.length <= 2}
                     onClick={() => {
@@ -356,7 +356,7 @@ function QuestionCard({ form, index, count, onMove, onRemove }: QuestionCardProp
                 />
                 <button
                   type="button"
-                  className={`${button.secondary} shrink-0`}
+                  className={`${button('secondary')} shrink-0`}
                   aria-label={`Xoá đáp án ${j + 1}`}
                   disabled={answers.fields.length <= 1}
                   onClick={() => {
