@@ -5,6 +5,8 @@ import { Link, useNavigate } from 'react-router'
 import { z } from 'zod'
 import { useAuth } from '../auth/auth-context'
 import { AuthCard, Field, FormError, SubmitButton } from '../components/form'
+import { ColdStartHint } from '../components/states'
+import { link } from '../components/ui'
 import { problemOf } from '../lib/api'
 
 // Mirrors the backend rules so most mistakes are caught before the request.
@@ -45,7 +47,7 @@ export function RegisterPage() {
         : 'Có lỗi xảy ra, vui lòng thử lại'
 
   return (
-    <AuthCard title="Tạo tài khoản giáo viên">
+    <AuthCard title="Tạo tài khoản giáo viên" description="Miễn phí, dùng ngay sau khi đăng ký">
       <form className="space-y-4" noValidate onSubmit={handleSubmit((values) => mutation.mutate(values))}>
         <FormError message={errorMessage} />
         <Field
@@ -68,6 +70,7 @@ export function RegisterPage() {
           label="Mật khẩu"
           type="password"
           autoComplete="new-password"
+          hint="Tối thiểu 8 ký tự"
           error={formState.errors.password?.message}
           {...register('password')}
         />
@@ -80,10 +83,11 @@ export function RegisterPage() {
           {...register('confirmPassword')}
         />
         <SubmitButton pending={mutation.isPending}>Đăng ký</SubmitButton>
+        {mutation.isPending && <ColdStartHint />}
       </form>
-      <p className="mt-6 text-center text-sm text-slate-600">
+      <p className="mt-6 text-center text-sm text-ink-muted">
         Đã có tài khoản?{' '}
-        <Link to="/login" className="font-medium text-blue-600 hover:underline">
+        <Link to="/login" className={link}>
           Đăng nhập
         </Link>
       </p>

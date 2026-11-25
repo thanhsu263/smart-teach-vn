@@ -31,6 +31,8 @@ export const select = `${control} h-11 px-3 md:h-12`
 
 export const label = 'block text-sm font-semibold text-ink'
 
+export const link = 'rounded-sm font-semibold text-primary hover:underline'
+
 export const card = 'rounded-md border border-border bg-surface p-5 shadow-card'
 
 export const muted = 'text-sm text-ink-muted'
