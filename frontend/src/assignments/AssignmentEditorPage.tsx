@@ -3,11 +3,11 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import type { ReactNode } from 'react'
 import { useForm } from 'react-hook-form'
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router'
-import { Field, FormError } from '../components/form'
+import { ConflictError, Field, FormError } from '../components/form'
 import { PageHeader } from '../components/page'
 import { EmptyState, ErrorState, Skeleton } from '../components/states'
 import { button, card, label, link, muted, select, textarea } from '../components/ui'
-import { problemOf } from '../lib/api'
+import { isModifiedElsewhere, problemOf } from '../lib/api'
 import type { Assignment } from '../lib/types'
 import { assignmentApi, assignmentKeys } from './api'
 import { type AssignmentForm, assignmentSchema, MAX_ASSIGNMENTS, REVEAL_LABELS, toForm, toPayload } from './schemas'
@@ -61,7 +61,7 @@ function EditorForm({ assignment }: { assignment?: Assignment }) {
   const classes = useQuery({ queryKey: ['classes', 'all'], queryFn: assignmentApi.allClasses })
   const quizzes = useQuery({ queryKey: ['quizzes', 'all'], queryFn: assignmentApi.allQuizzes })
 
-  const { register, handleSubmit, setError, formState } = useForm<AssignmentForm>({
+  const { register, handleSubmit, reset, setError, formState } = useForm<AssignmentForm>({
     resolver: zodResolver(assignmentSchema),
     defaultValues: toForm(assignment, params.get('classId') ?? undefined),
   })
@@ -69,7 +69,7 @@ function EditorForm({ assignment }: { assignment?: Assignment }) {
 
   const save = useMutation({
     mutationFn: (form: AssignmentForm) =>
-      assignment ? assignmentApi.update(assignment.id, toPayload(form)) : assignmentApi.create(toPayload(form)),
+      assignment ? assignmentApi.update(assignment.id, toPayload(form), assignment.version) : assignmentApi.create(toPayload(form)),
     onSuccess: async (saved) => {
       await queryClient.invalidateQueries({ queryKey: assignmentKeys.all })
       navigate(`/assignments/${saved.id}`)
@@ -81,8 +81,23 @@ function EditorForm({ assignment }: { assignment?: Assignment }) {
     },
   })
 
+  // 409 from optimistic locking: load the copy saved elsewhere (this tab's edits are dropped).
+  const conflict = assignment !== undefined && isModifiedElsewhere(save.error)
+  const reload = useMutation({
+    mutationFn: () =>
+      queryClient.fetchQuery({
+        queryKey: assignmentKeys.detail(assignment!.id),
+        queryFn: () => assignmentApi.get(assignment!.id),
+        staleTime: 0,
+      }),
+    onSuccess: (fresh) => {
+      reset(toForm(fresh))
+      save.reset()
+    },
+  })
+
   const problem = problemOf(save.error)
-  const saveError = !save.error
+  const saveError = !save.error || conflict
     ? undefined
     : problem?.errors
       ? undefined
@@ -236,6 +251,13 @@ function EditorForm({ assignment }: { assignment?: Assignment }) {
       </section>
 
       <FormError message={saveError} />
+      {conflict && (
+        <ConflictError
+          message="Bài tập đã được sửa ở nơi khác (tab hoặc máy khác). Tải lại để xem bản mới nhất; thay đổi chưa lưu ở đây sẽ mất."
+          onReload={() => reload.mutate()}
+          reloading={reload.isPending}
+        />
+      )}
       <div className="flex flex-wrap gap-2">
         <button type="submit" className={button('primary')} disabled={save.isPending}>
           {save.isPending ? 'Đang lưu…' : assignment ? 'Lưu' : 'Tạo bản nháp'}

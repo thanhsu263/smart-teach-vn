@@ -7,7 +7,7 @@ import { useAuth } from '../auth/auth-context'
 import { AuthCard, Field, FormError, SubmitButton } from '../components/form'
 import { ColdStartHint } from '../components/states'
 import { button, link } from '../components/ui'
-import { problemOf } from '../lib/api'
+import { problemOf, tooManyRequestsMessage } from '../lib/api'
 
 const schema = z.object({
   email: z.email('Email không hợp lệ'),
@@ -34,9 +34,10 @@ export function LoginPage() {
   })
 
   const errorMessage = mutation.error
-    ? problemOf(mutation.error)?.status === 401
-      ? 'Email hoặc mật khẩu không đúng'
-      : 'Có lỗi xảy ra, vui lòng thử lại'
+    ? (tooManyRequestsMessage(mutation.error) ??
+      (problemOf(mutation.error)?.status === 401
+        ? 'Email hoặc mật khẩu không đúng'
+        : 'Có lỗi xảy ra, vui lòng thử lại'))
     : undefined
 
   return (
@@ -74,6 +75,11 @@ export function LoginPage() {
           error={formState.errors.password?.message}
           {...register('password')}
         />
+        <p className="-mt-2 text-right text-sm">
+          <Link to="/forgot-password" className={link}>
+            Quên mật khẩu?
+          </Link>
+        </p>
         <SubmitButton pending={mutation.isPending}>Đăng nhập</SubmitButton>
         {mutation.isPending && <ColdStartHint />}
       </form>

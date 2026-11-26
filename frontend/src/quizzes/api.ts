@@ -15,7 +15,8 @@ export const quizApi = {
     (await api.get<Page<QuizSummary>>('/api/quizzes', { params: { page, size: PAGE_SIZE } })).data,
   get: async (id: number) => (await api.get<Quiz>(`/api/quizzes/${id}`)).data,
   create: async (payload: QuizPayload) => (await api.post<Quiz>('/api/quizzes', payload)).data,
-  update: async (id: number, payload: QuizPayload) => (await api.put<Quiz>(`/api/quizzes/${id}`, payload)).data,
+  update: async (id: number, payload: QuizPayload, version: number) =>
+    (await api.put<Quiz>(`/api/quizzes/${id}`, { ...payload, version })).data,
   remove: async (id: number) => {
     await api.delete(`/api/quizzes/${id}`)
   },

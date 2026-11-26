@@ -70,3 +70,17 @@ api.interceptors.response.use(
 export function problemOf(error: unknown): ProblemDetail | undefined {
   return axios.isAxiosError<ProblemDetail>(error) ? error.response?.data : undefined
 }
+
+/** Optimistic locking: the backend refuses a save made from an older copy with this 409. */
+export function isModifiedElsewhere(error: unknown): boolean {
+  const problem = problemOf(error)
+  return problem?.status === 409 && problem.detail?.startsWith('Modified elsewhere') === true
+}
+
+/** Message for a 429 from the rate limiter, or undefined for any other error. */
+export function tooManyRequestsMessage(error: unknown): string | undefined {
+  if (!axios.isAxiosError(error) || error.response?.status !== 429) return undefined
+  const seconds = Number(error.response.headers['retry-after'])
+  const wait = seconds > 0 ? (seconds < 60 ? `${seconds} giây` : `${Math.ceil(seconds / 60)} phút`) : 'một lát'
+  return `Bạn thao tác quá nhanh, hãy thử lại sau ${wait}.`
+}

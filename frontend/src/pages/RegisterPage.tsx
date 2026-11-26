@@ -7,7 +7,7 @@ import { useAuth } from '../auth/auth-context'
 import { AuthCard, Field, FormError, SubmitButton } from '../components/form'
 import { ColdStartHint } from '../components/states'
 import { link } from '../components/ui'
-import { problemOf } from '../lib/api'
+import { problemOf, tooManyRequestsMessage } from '../lib/api'
 
 // Mirrors the backend rules so most mistakes are caught before the request.
 const schema = z
@@ -40,7 +40,9 @@ export function RegisterPage() {
   const status = problemOf(mutation.error)?.status
   const errorMessage = !mutation.error
     ? undefined
-    : status === 409
+    : status === 429
+      ? tooManyRequestsMessage(mutation.error)
+      : status === 409
       ? 'Email này đã được đăng ký'
       : status === 400
         ? 'Thông tin chưa hợp lệ, vui lòng kiểm tra lại'

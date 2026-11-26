@@ -79,6 +79,8 @@ export interface Question {
 }
 
 export interface Quiz {
+  /** Optimistic locking: sent back on update so a stale save gets 409. */
+  version: number
   id: number
   title: string
   createdAt: string
@@ -109,6 +111,7 @@ export interface AssignmentSummary {
 }
 
 export interface Assignment {
+  version: number
   id: number
   classId: number
   className: string | null

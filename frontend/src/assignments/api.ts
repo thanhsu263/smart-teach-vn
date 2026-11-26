@@ -21,8 +21,8 @@ export const assignmentApi = {
     ).data,
   get: async (id: number) => (await api.get<Assignment>(`/api/assignments/${id}`)).data,
   create: async (payload: AssignmentPayload) => (await api.post<Assignment>('/api/assignments', payload)).data,
-  update: async (id: number, payload: AssignmentPayload) =>
-    (await api.put<Assignment>(`/api/assignments/${id}`, payload)).data,
+  update: async (id: number, payload: AssignmentPayload, version: number) =>
+    (await api.put<Assignment>(`/api/assignments/${id}`, { ...payload, version })).data,
   remove: async (id: number) => {
     await api.delete(`/api/assignments/${id}`)
   },

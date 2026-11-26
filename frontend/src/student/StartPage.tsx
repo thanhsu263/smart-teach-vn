@@ -5,7 +5,7 @@ import { useNavigate, useParams } from 'react-router'
 import { z } from 'zod'
 import { AuthCard, Field, FormError, SubmitButton } from '../components/form'
 import { ColdStartHint } from '../components/states'
-import { problemOf } from '../lib/api'
+import { problemOf, tooManyRequestsMessage } from '../lib/api'
 import { studentApi } from './api'
 
 const startSchema = z.object({
@@ -31,7 +31,9 @@ export function StartPage() {
   const problem = problemOf(start.error)
   const error = !start.error
     ? undefined
-    : problem?.status === 404
+    : problem?.status === 429
+      ? tooManyRequestsMessage(start.error)
+      : problem?.status === 404
       ? 'Mã bài hoặc mã học sinh không đúng.'
       : problem?.status === 409
         ? problem.detail?.includes('not open')
