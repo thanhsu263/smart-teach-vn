@@ -1,0 +1,6 @@
+# Production profile (SPRING_PROFILES_ACTIVE=prod, or demo,prod on Render).
+logging:
+  structured:
+    format:
+      # One JSON object per line (Elastic Common Schema); MDC values such as requestId are fields.
+      console: ecs

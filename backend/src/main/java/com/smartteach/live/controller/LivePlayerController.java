@@ -6,8 +6,11 @@ import com.smartteach.live.dto.LiveAnswerRequest;
 import com.smartteach.live.dto.LiveState;
 import com.smartteach.live.dto.PlayerView;
 import com.smartteach.live.service.LiveService;
+import com.smartteach.common.ratelimit.RateLimitRule;
+import com.smartteach.common.ratelimit.RateLimiter;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -30,6 +33,7 @@ public class LivePlayerController {
     public static final String TOKEN_HEADER = "X-Player-Token";
 
     private final LiveService liveService;
+    private final RateLimiter rateLimiter;
 
     @GetMapping
     @Operation(summary = "Room state (also pushed to /topic/live/{pin}); never contains the answer of an open question")
@@ -40,7 +44,9 @@ public class LivePlayerController {
     @PostMapping("/players")
     @ResponseStatus(HttpStatus.CREATED)
     @Operation(summary = "Join the lobby with a nickname (1-20 characters, unique in the room)")
-    public JoinResponse join(@PathVariable String pin, @Valid @RequestBody JoinRequest request) {
+    public JoinResponse join(@PathVariable String pin, @Valid @RequestBody JoinRequest request,
+                             HttpServletRequest http) {
+        rateLimiter.check(RateLimitRule.LIVE_JOIN, http.getRemoteAddr());
         return liveService.join(pin, request.nickname());
     }
 

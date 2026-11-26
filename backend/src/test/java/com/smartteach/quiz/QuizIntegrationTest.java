@@ -217,6 +217,31 @@ class QuizIntegrationTest extends IntegrationTest {
 
     // --- helpers ---
 
+    @Test
+    void saveBasedOnAnOldVersionIsRefusedWith409() throws Exception {
+        String teacher = signUpTeacher();
+        long id = createQuiz(teacher, FULL_QUIZ);
+        perform(teacher, get("/api/quizzes/" + id)).andExpect(jsonPath("$.version").value(0));
+
+        // Two tabs opened version 0. The first save wins and moves the quiz to version 1.
+        String tabA = "{\"title\": \"Tab A\", \"version\": 0}";
+        String tabB = "{\"title\": \"Tab B\", \"version\": 0}";
+        perform(teacher, put("/api/quizzes/" + id), tabA)
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.version").value(1));
+        perform(teacher, put("/api/quizzes/" + id), tabB)
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.status").value(409));
+
+        perform(teacher, get("/api/quizzes/" + id))
+                .andExpect(jsonPath("$.title").value("Tab A"))
+                .andExpect(jsonPath("$.version").value(1));
+        // After reloading, the second tab sends the current version and the save goes through.
+        perform(teacher, put("/api/quizzes/" + id), "{\"title\": \"Tab B\", \"version\": 1}")
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.version").value(2));
+    }
+
     private long createQuiz(String auth, String json) throws Exception {
         String response = perform(auth, post("/api/quizzes"), json)
                 .andExpect(status().isCreated())

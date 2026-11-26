@@ -7,6 +7,9 @@ import com.smartteach.live.dto.LiveState;
 import com.smartteach.live.dto.PlayerView;
 import com.smartteach.quiz.dto.QuizResponse;
 import com.smartteach.quiz.service.QuizService;
+import io.micrometer.core.instrument.Gauge;
+import io.micrometer.core.instrument.MeterRegistry;
+import io.micrometer.core.instrument.binder.MeterBinder;
 import jakarta.annotation.PreDestroy;
 import java.security.SecureRandom;
 import java.time.Clock;
@@ -34,7 +37,7 @@ import tools.jackson.databind.JsonNode;
 @Slf4j
 @Service
 @RequiredArgsConstructor
-public class LiveService {
+public class LiveService implements MeterBinder {
 
     public static final String TOPIC_PREFIX = "/topic/live/";
     static final int MAX_ROOMS = 200;
@@ -48,6 +51,18 @@ public class LiveService {
     private final SecureRandom random = new SecureRandom();
     /** Closes questions when their time is up. One thread is enough: the work is tiny. */
     private final ScheduledExecutorService timer = Executors.newSingleThreadScheduledExecutor();
+
+    /** Spring Boot calls this for every MeterBinder bean; the gauge is read on every scrape. */
+    @Override
+    public void bindTo(MeterRegistry registry) {
+        Gauge.builder("smartteach.live.rooms.open", this, LiveService::openRoomCount)
+                .description("Live quiz rooms that have not ended")
+                .register(registry);
+    }
+
+    long openRoomCount() {
+        return rooms.values().stream().filter(room -> room.status() != LiveStatus.ENDED).count();
+    }
 
     /** Opens a room for one of the teacher's quizzes. A teacher hosts one game at a time: an older one is ended. */
     public LiveState create(Long ownerId, Long quizId) {

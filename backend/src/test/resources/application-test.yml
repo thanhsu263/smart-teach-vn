@@ -2,6 +2,11 @@ app:
   auth:
     # Test-only key so CI does not need a JWT_SECRET variable.
     jwt-secret: test-only-jwt-secret-not-used-anywhere-else-0123456789
+  metrics:
+    password: test-metrics-password
+  # The suite registers many users from 127.0.0.1; RateLimitIntegrationTest switches it back on.
+  rate-limit:
+    enabled: false
 
 spring:
   jpa:

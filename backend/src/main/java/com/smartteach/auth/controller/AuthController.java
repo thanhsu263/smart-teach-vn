@@ -2,10 +2,15 @@ package com.smartteach.auth.controller;
 
 import com.smartteach.auth.config.AuthProperties;
 import com.smartteach.auth.dto.AuthResponse;
+import com.smartteach.auth.dto.ForgotPasswordRequest;
 import com.smartteach.auth.dto.LoginRequest;
 import com.smartteach.auth.dto.RegisterRequest;
+import com.smartteach.auth.dto.ResetPasswordRequest;
 import com.smartteach.auth.service.AuthService;
 import com.smartteach.auth.service.AuthService.AuthResult;
+import com.smartteach.auth.service.PasswordResetService;
+import com.smartteach.common.ratelimit.RateLimitRule;
+import com.smartteach.common.ratelimit.RateLimiter;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.servlet.http.Cookie;
@@ -31,24 +36,35 @@ import org.springframework.web.util.WebUtils;
 public class AuthController {
 
     private final AuthService authService;
+    private final PasswordResetService passwordResetService;
     private final AuthProperties properties;
     private final Clock clock;
+    private final RateLimiter rateLimiter;
 
     @PostMapping("/register")
     @Operation(summary = "Create a teacher account and sign in")
-    public ResponseEntity<AuthResponse> register(@Valid @RequestBody RegisterRequest request) {
+    public ResponseEntity<AuthResponse> register(@Valid @RequestBody RegisterRequest request,
+                                                 HttpServletRequest http) {
+        String ip = http.getRemoteAddr();
+        rateLimiter.check(RateLimitRule.AUTH_IP, ip);
+        rateLimiter.check(RateLimitRule.REGISTER, ip);
         return withRefreshCookie(HttpStatus.CREATED, authService.register(request));
     }
 
     @PostMapping("/login")
     @Operation(summary = "Sign in with email and password")
-    public ResponseEntity<AuthResponse> login(@Valid @RequestBody LoginRequest request) {
+    public ResponseEntity<AuthResponse> login(@Valid @RequestBody LoginRequest request, HttpServletRequest http) {
+        String ip = http.getRemoteAddr();
+        rateLimiter.check(RateLimitRule.AUTH_IP, ip);
+        // Per IP and email together: a stranger guessing passwords cannot lock the real user out.
+        rateLimiter.check(RateLimitRule.LOGIN, ip + "|" + request.email().strip());
         return withRefreshCookie(HttpStatus.OK, authService.login(request));
     }
 
     @PostMapping("/refresh")
     @Operation(summary = "Rotate the refresh cookie and get a new access token")
     public ResponseEntity<AuthResponse> refresh(HttpServletRequest request) {
+        rateLimiter.check(RateLimitRule.REFRESH, request.getRemoteAddr());
         return withRefreshCookie(HttpStatus.OK, authService.refresh(readRefreshCookie(request)));
     }
 
@@ -59,6 +75,30 @@ public class AuthController {
         return ResponseEntity.noContent()
                 .header(HttpHeaders.SET_COOKIE, refreshCookie("", Duration.ZERO).toString())
                 .build();
+    }
+
+    @PostMapping("/forgot-password")
+    @Operation(summary = "Email a password reset link",
+            description = "Always 204, also for unknown emails, so it does not reveal who has an account.")
+    public ResponseEntity<Void> forgotPassword(@Valid @RequestBody ForgotPasswordRequest request,
+                                               HttpServletRequest http) {
+        rateLimiter.check(RateLimitRule.AUTH_IP, http.getRemoteAddr());
+        // Per email too, so nobody can flood one inbox from many addresses.
+        rateLimiter.check(RateLimitRule.FORGOT_PASSWORD, request.email().strip());
+        passwordResetService.requestReset(request.email());
+        return ResponseEntity.noContent().build();
+    }
+
+    @PostMapping("/reset-password")
+    @Operation(summary = "Set a new password with the token from the email",
+            description = "The token works once, for 30 minutes. Every session of the user is signed out.")
+    public ResponseEntity<Void> resetPassword(@Valid @RequestBody ResetPasswordRequest request,
+                                              HttpServletRequest http) {
+        String ip = http.getRemoteAddr();
+        rateLimiter.check(RateLimitRule.AUTH_IP, ip);
+        rateLimiter.check(RateLimitRule.RESET_PASSWORD, ip);
+        passwordResetService.resetPassword(request.token(), request.newPassword());
+        return ResponseEntity.noContent().build();
     }
 
     private ResponseEntity<AuthResponse> withRefreshCookie(HttpStatus status, AuthResult result) {
