@@ -3,8 +3,12 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useEffect, useRef } from 'react'
 import { useFieldArray, useForm, useWatch, type UseFormReturn } from 'react-hook-form'
 import { Link, useBlocker, useLocation, useNavigate, useParams } from 'react-router'
+import { useConfirm } from '../components/confirm-context'
 import { FormError } from '../components/form'
-import { button, card, input, select } from '../components/ui'
+import { Icon } from '../components/Icon'
+import { PageHeader } from '../components/page'
+import { EmptyState, ErrorState, Skeleton } from '../components/states'
+import { button, card, input, link, select, textarea } from '../components/ui'
 import { problemOf } from '../lib/api'
 import type { QuestionKind, Quiz } from '../lib/types'
 import { quizApi, quizKeys } from './api'
@@ -34,19 +38,32 @@ export function QuizEditorPage() {
   })
 
   if (quizId !== undefined) {
-    if (quiz.isPending) return <p className="text-slate-500">Đang tải…</p>
-    if (quiz.isError) {
-      const status = problemOf(quiz.error)?.status
+    if (quiz.isPending) {
       return (
-        <div className={`${card} space-y-3`}>
-          <p className="text-slate-700">
-            {status === 404 || status === 400 ? 'Không tìm thấy quiz này.' : 'Không tải được quiz.'}
-          </p>
-          <Link to="/quizzes" className="text-sm text-blue-600 hover:underline">
-            ← Về danh sách quiz
-          </Link>
+        <div role="status" aria-label="Đang tải" className="space-y-4">
+          <Skeleton className="h-9 w-48" />
+          <Skeleton className="h-24 w-full" />
+          <Skeleton className="h-64 w-full" />
         </div>
       )
+    }
+    if (quiz.isError) {
+      const status = problemOf(quiz.error)?.status
+      if (status === 404 || status === 400) {
+        return (
+          <EmptyState
+            icon="quiz"
+            title="Không tìm thấy quiz này"
+            description="Quiz có thể đã bị xoá, hoặc đường dẫn không đúng."
+            action={
+              <Link to="/quizzes" className={button('secondary', 'sm')}>
+                Về danh sách quiz
+              </Link>
+            }
+          />
+        )
+      }
+      return <ErrorState message="Không tải được quiz." onRetry={() => void quiz.refetch()} />
     }
   }
 
@@ -106,11 +123,10 @@ function QuizEditor({ quiz }: { quiz?: Quiz }) {
 
   return (
     <form className="space-y-4" noValidate onSubmit={handleSubmit((values) => save.mutate(values))}>
-      <Link to="/quizzes" className="text-sm text-blue-600 hover:underline">
-        ← Quiz
-      </Link>
+      <PageHeader back={{ to: '/quizzes', label: 'Quiz' }} title={quiz ? 'Sửa quiz' : 'Tạo quiz'} />
 
-      <div className={`${card} sticky top-0 z-10 space-y-3`}>
+      {/* Sticks just below the app's top bar (h-16, md:h-18) so "Lưu quiz" stays in reach on long quizzes. */}
+      <div className={`${card} sticky top-16 z-[5] space-y-3 md:top-18`}>
         <div className="flex flex-wrap items-start gap-3">
           <div className="min-w-0 flex-1 space-y-1">
             <input
@@ -120,13 +136,13 @@ function QuizEditor({ quiz }: { quiz?: Quiz }) {
               className={`${input} text-lg font-semibold`}
               {...register('title')}
             />
-            {formState.errors.title && <p className="text-sm text-red-600">{formState.errors.title.message}</p>}
+            {formState.errors.title && <p className="text-sm text-danger">{formState.errors.title.message}</p>}
           </div>
           <div className="flex items-center gap-3">
-            <span className="text-sm text-slate-500" aria-live="polite">
+            <span className="text-sm text-ink-muted" aria-live="polite">
               {justSaved ? 'Đã lưu' : formState.isDirty ? 'Chưa lưu' : ''}
             </span>
-            <button type="submit" className={button.primary} disabled={save.isPending}>
+            <button type="submit" className={button('primary')} disabled={save.isPending}>
               {save.isPending ? 'Đang lưu…' : 'Lưu quiz'}
             </button>
           </div>
@@ -136,7 +152,11 @@ function QuizEditor({ quiz }: { quiz?: Quiz }) {
       </div>
 
       {questions.fields.length === 0 && (
-        <div className={`${card} text-center text-slate-500`}>Quiz chưa có câu hỏi nào.</div>
+        <EmptyState
+          icon="quiz"
+          title="Quiz chưa có câu hỏi nào"
+          description="Bấm “Thêm câu hỏi” ở dưới. Mỗi câu có thể là một đáp án, nhiều đáp án, đúng/sai hoặc trả lời ngắn."
+        />
       )}
 
       <ol className="space-y-4">
@@ -154,11 +174,12 @@ function QuizEditor({ quiz }: { quiz?: Quiz }) {
 
       <button
         type="button"
-        className={`${button.secondary} w-full border-dashed`}
+        className={`${button('secondary')} w-full border-dashed`}
         disabled={questions.fields.length >= MAX_QUESTIONS}
         onClick={() => questions.append(newQuestion())}
       >
-        + Thêm câu hỏi ({questions.fields.length}/{MAX_QUESTIONS})
+        <Icon name="plus" />
+        Thêm câu hỏi ({questions.fields.length}/{MAX_QUESTIONS})
       </button>
     </form>
   )
@@ -209,12 +230,20 @@ function QuestionCard({ form, index, count, onMove, onRemove }: QuestionCardProp
     revalidate()
   }
 
+  const confirm = useConfirm()
+  const confirmRemove = async () => {
+    // An empty question goes without asking: there is nothing to lose.
+    if (!getValues(`questions.${index}.prompt`).trim()) return onRemove()
+    const ok = await confirm({ title: `Xoá câu ${index + 1}?`, confirmLabel: 'Xoá câu', danger: true })
+    if (ok) onRemove()
+  }
+
   const kindField = register(`questions.${index}.kind`)
 
   return (
     <li className={`${card} space-y-4`}>
       <div className="flex flex-wrap items-center gap-2">
-        <span className="mr-1 font-semibold text-slate-900">Câu {index + 1}</span>
+        <h2 className="mr-1 text-heading text-ink">Câu {index + 1}</h2>
         <select
           aria-label={`Loại câu ${index + 1}`}
           className={select}
@@ -245,29 +274,23 @@ function QuestionCard({ form, index, count, onMove, onRemove }: QuestionCardProp
         <div className="ml-auto flex gap-1">
           <button
             type="button"
-            className={button.secondary}
+            className={button('ghost', 'sm')}
             aria-label={`Đưa câu ${index + 1} lên`}
             disabled={index === 0}
             onClick={() => onMove(index - 1)}
           >
-            ↑
+            <Icon name="back" className="size-4 rotate-90" />
           </button>
           <button
             type="button"
-            className={button.secondary}
+            className={button('ghost', 'sm')}
             aria-label={`Đưa câu ${index + 1} xuống`}
             disabled={index === count - 1}
             onClick={() => onMove(index + 1)}
           >
-            ↓
+            <Icon name="next" className="size-4 rotate-90" />
           </button>
-          <button
-            type="button"
-            className={button.danger}
-            onClick={() => {
-              if (!getValues(`questions.${index}.prompt`).trim() || window.confirm(`Xoá câu ${index + 1}?`)) onRemove()
-            }}
-          >
+          <button type="button" className={button('ghostDanger', 'sm')} onClick={() => void confirmRemove()}>
             Xoá
           </button>
         </div>
@@ -279,15 +302,15 @@ function QuestionCard({ form, index, count, onMove, onRemove }: QuestionCardProp
           placeholder="Nội dung câu hỏi"
           rows={2}
           aria-invalid={errors?.prompt ? true : undefined}
-          className={input}
+          className={textarea}
           {...register(`questions.${index}.prompt`)}
         />
-        {errors?.prompt && <p className="text-sm text-red-600">{errors.prompt.message}</p>}
+        {errors?.prompt && <p className="text-sm text-danger">{errors.prompt.message}</p>}
       </div>
 
       {!isText && (
         <fieldset className="space-y-2">
-          <legend className="mb-2 text-sm text-slate-500">
+          <legend className="mb-2 text-sm text-ink-muted">
             {isMulti ? 'Tick mọi đáp án đúng.' : 'Chọn một đáp án đúng.'}
           </legend>
           {options.fields.map((field, j) => (
@@ -297,7 +320,7 @@ function QuestionCard({ form, index, count, onMove, onRemove }: QuestionCardProp
                   type={isMulti ? 'checkbox' : 'radio'}
                   name={`correct-${index}`}
                   aria-label={`Lựa chọn ${j + 1} là đáp án đúng`}
-                  className="size-5 shrink-0 accent-green-600"
+                  className="size-5 shrink-0 accent-success"
                   checked={optionValues[j]?.correct ?? false}
                   onChange={(event) => markCorrect(j, event.target.checked)}
                 />
@@ -311,7 +334,7 @@ function QuestionCard({ form, index, count, onMove, onRemove }: QuestionCardProp
                 {kind !== 'true_false' && (
                   <button
                     type="button"
-                    className={`${button.secondary} shrink-0`}
+                    className={button('ghost', 'sm')}
                     aria-label={`Xoá lựa chọn ${j + 1}`}
                     disabled={options.fields.length <= 2}
                     onClick={() => {
@@ -319,31 +342,31 @@ function QuestionCard({ form, index, count, onMove, onRemove }: QuestionCardProp
                       revalidate()
                     }}
                   >
-                    ×
+                    <Icon name="close" className="size-4" />
                   </button>
                 )}
               </div>
               {errors?.options?.[j]?.label && (
-                <p className="pl-7 text-sm text-red-600">{errors.options[j].label.message}</p>
+                <p className="pl-7 text-sm text-danger">{errors.options[j].label.message}</p>
               )}
             </div>
           ))}
           {kind !== 'true_false' && options.fields.length < MAX_OPTIONS && (
             <button
               type="button"
-              className="text-sm text-blue-600 hover:underline"
+              className={`${link} text-sm`}
               onClick={() => options.append({ label: '', correct: false })}
             >
               + Thêm lựa chọn
             </button>
           )}
-          {arrayError(errors?.options) && <p className="text-sm text-red-600">{arrayError(errors?.options)}</p>}
+          {arrayError(errors?.options) && <p className="text-sm text-danger">{arrayError(errors?.options)}</p>}
         </fieldset>
       )}
 
       {isText && (
         <fieldset className="space-y-2">
-          <legend className="mb-2 text-sm text-slate-500">Đáp án được chấp nhận (không phân biệt hoa thường).</legend>
+          <legend className="mb-2 text-sm text-ink-muted">Đáp án được chấp nhận (không phân biệt hoa thường).</legend>
           {answers.fields.map((field, j) => (
             <div key={field.id} className="space-y-1">
               <div className="flex items-center gap-2">
@@ -356,7 +379,7 @@ function QuestionCard({ form, index, count, onMove, onRemove }: QuestionCardProp
                 />
                 <button
                   type="button"
-                  className={`${button.secondary} shrink-0`}
+                  className={button('ghost', 'sm')}
                   aria-label={`Xoá đáp án ${j + 1}`}
                   disabled={answers.fields.length <= 1}
                   onClick={() => {
@@ -364,27 +387,27 @@ function QuestionCard({ form, index, count, onMove, onRemove }: QuestionCardProp
                     revalidate()
                   }}
                 >
-                  ×
+                  <Icon name="close" className="size-4" />
                 </button>
               </div>
               {errors?.acceptedAnswers?.[j]?.value && (
-                <p className="text-sm text-red-600">{errors.acceptedAnswers[j].value.message}</p>
+                <p className="text-sm text-danger">{errors.acceptedAnswers[j].value.message}</p>
               )}
             </div>
           ))}
           {answers.fields.length < MAX_ANSWERS && (
             <button
               type="button"
-              className="text-sm text-blue-600 hover:underline"
+              className={`${link} text-sm`}
               onClick={() => answers.append({ value: '' })}
             >
               + Thêm đáp án
             </button>
           )}
           {arrayError(errors?.acceptedAnswers) && (
-            <p className="text-sm text-red-600">{arrayError(errors?.acceptedAnswers)}</p>
+            <p className="text-sm text-danger">{arrayError(errors?.acceptedAnswers)}</p>
           )}
-          <label className="flex items-center gap-2 text-sm text-slate-700">
+          <label className="flex items-center gap-2 text-sm text-ink">
             <input type="checkbox" className="size-4" {...register(`questions.${index}.ignoreDiacritics`)} />
             Bỏ qua dấu khi chấm (“Ha Noi” cũng đúng với “Hà Nội”)
           </label>
@@ -407,11 +430,21 @@ function useUnsavedChangesWarning(dirty: boolean, leaving: { current: boolean })
       dirty && !leaving.current && currentLocation.pathname !== nextLocation.pathname,
   )
 
+  const confirm = useConfirm()
+  // The blocker object is new on every render; keep the latest one so the effect only reacts to its state.
+  const blockerRef = useRef(blocker)
+  useEffect(() => {
+    blockerRef.current = blocker
+  })
   useEffect(() => {
     if (blocker.state !== 'blocked') return
-    if (window.confirm('Quiz có thay đổi chưa lưu. Rời trang và bỏ các thay đổi?')) blocker.proceed()
-    else blocker.reset()
-  }, [blocker])
+    void confirm({
+      title: 'Rời trang khi chưa lưu?',
+      message: 'Quiz có thay đổi chưa lưu. Các thay đổi này sẽ mất.',
+      confirmLabel: 'Rời trang',
+      danger: true,
+    }).then((ok) => (ok ? blockerRef.current.proceed?.() : blockerRef.current.reset?.()))
+  }, [blocker.state, confirm])
 
   useEffect(() => {
     if (!dirty) return

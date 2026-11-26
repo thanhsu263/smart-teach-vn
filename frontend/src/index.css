@@ -1,1 +1,100 @@
 @import "tailwindcss";
+
+/* Be Vietnam Pro, self-hosted. Only the latin and vietnamese subsets: unicode-range makes the browser
+   download a file only when the page uses those characters. */
+@import "@fontsource/be-vietnam-pro/latin-400.css";
+@import "@fontsource/be-vietnam-pro/vietnamese-400.css";
+@import "@fontsource/be-vietnam-pro/latin-600.css";
+@import "@fontsource/be-vietnam-pro/vietnamese-600.css";
+@import "@fontsource/be-vietnam-pro/latin-700.css";
+@import "@fontsource/be-vietnam-pro/vietnamese-700.css";
+
+/* Design tokens from the SmartTeach Figma file. Each one becomes a Tailwind utility,
+   e.g. --color-primary -> bg-primary / text-primary, --shadow-card -> shadow-card. */
+@theme {
+  --font-sans: "Be Vietnam Pro", system-ui, -apple-system, "Segoe UI", sans-serif;
+
+  --color-primary: #2259ed;
+  --color-primary-hover: #1948ca;
+  --color-primary-deep: #153daa;
+  --color-primary-tint: #f0f5ff;
+  --color-brand: #102b68;
+  --color-accent: #ffd453;
+  --color-accent-deep: #f2c23d;
+  --color-ink: #142b50;
+  --color-ink-muted: #52627a;
+  --color-page: #f0f5ff;
+  --color-surface: #ffffff;
+  --color-border: #d7e0ed;
+  --color-border-strong: #687b96;
+  --color-success: #17613e;
+  --color-warning: #9a6700;
+  --color-danger: #b42318;
+  --color-on-primary-muted: #dce7ff;
+
+  --text-display: 2.75rem;
+  --text-display--line-height: 1.15;
+  --text-display--font-weight: 800;
+  --text-title: 1.875rem;
+  --text-title--line-height: 1.25;
+  --text-title--font-weight: 700;
+  --text-heading: 1.25rem;
+  --text-heading--line-height: 1.4;
+  --text-heading--font-weight: 600;
+
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+
+  --shadow-rest: 0 1px 2px rgb(20 43 80 / 0.06);
+  --shadow-raised: 0 8px 24px rgb(20 43 80 / 0.12);
+  --shadow-card: 0 1px 2px rgb(20 43 80 / 0.04);
+
+  /* Figma shell breakpoints: drawer below 720px, narrow sidebar 720-959px, full sidebar from 960px. */
+  --breakpoint-md: 45rem;
+  --breakpoint-lg: 60rem;
+}
+
+@layer base {
+  html {
+    background-color: var(--color-page);
+    color: var(--color-ink);
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  :focus-visible {
+    outline: 3px solid var(--color-primary);
+    outline-offset: 2px;
+  }
+
+  dialog::backdrop {
+    background: rgb(20 43 80 / 0.5);
+  }
+}
+
+/* Loading placeholder: a light band sweeps across. Off for people who ask for less motion. */
+@keyframes shimmer {
+  from {
+    background-position: 100% 0;
+  }
+  to {
+    background-position: -100% 0;
+  }
+}
+
+.skeleton {
+  background: linear-gradient(90deg, var(--color-border) 25%, var(--color-primary-tint) 50%, var(--color-border) 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.4s linear infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

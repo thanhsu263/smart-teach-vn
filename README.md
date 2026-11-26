@@ -17,8 +17,9 @@ frontend. The UI is in Vietnamese; code, API and docs are in English.
 **Live demo:** https://smart-teach-vn.vercel.app · **API docs:**
 https://smartteach-api.onrender.com/swagger-ui.html
 
-Demo teacher account: `demo@smartteach.vn` / `DEMO_PASSWORD_HERE`. The demo data is
-recreated every time the backend starts, so feel free to change anything.
+Demo teacher account: `demo@smartteach.vn` / `DEMO_PASSWORD_HERE`, or press **Dùng tài
+khoản demo** on the login page. The demo data is recreated every time the backend starts, so
+feel free to change anything.
 
 > The demo runs on free plans. The backend sleeps after 15 idle minutes, so the first request
 > after a quiet period can take 2–3 minutes while the backend and the database wake up; after
@@ -45,6 +46,37 @@ recreated every time the backend starts, so feel free to change anything.
 | Live quiz: student answering | Live quiz: student after the reveal |
 |---|---|
 | ![Live player question](docs/screenshots/live-player-question.png) | ![Live player reveal](docs/screenshots/live-player-reveal.png) |
+
+| Login with the demo button (phone) | Navigation drawer (phone) |
+|---|---|
+| ![Login on a phone](docs/screenshots/login-mobile.png) | ![Mobile menu](docs/screenshots/mobile-menu.png) |
+
+## UI
+
+The frontend uses no UI kit: a small set of components written for this project on top of
+Tailwind CSS.
+
+- **Design tokens:** colours, shadows and type sizes come from the Figma design and live in
+  one Tailwind `@theme` block ([`frontend/src/index.css`](frontend/src/index.css)), so pages
+  use names like `bg-primary` or `text-ink-muted` instead of raw colours. The font is Be
+  Vietnam Pro, self-hosted with only the Latin and Vietnamese subsets.
+- **Every data view has four states:** a skeleton while loading, an empty state with the next
+  action, an error with a retry button, and the data. When the first load or a sign-in takes
+  more than a few seconds (the free backend is waking up), a hint explains the wait instead
+  of an endless spinner.
+- **Phones first for students:** the student and live quiz pages are designed at 375 px wide
+  with large touch targets; the teacher pages collapse the sidebar into a drawer.
+- **No surprises:** destructive actions (delete, submit, end a live game) ask for
+  confirmation in an accessible native `<dialog>`.
+- **Routes are code-split**, so a student opening an assignment link does not download the
+  teacher pages.
+
+Lighthouse (production build, simulated mobile throttling, median of 3 runs):
+
+| Page | Performance (375 px / 1280 px) | Accessibility |
+|---|---|---|
+| Login | 96 / 100 | 100 |
+| Student assignment | 96 / 100 | 100 |
 
 ## Features
 
@@ -155,6 +187,7 @@ API docs (Swagger UI): http://localhost:8080/swagger-ui.html
 | `KEEP_ALIVE_URL` | backend | Public backend URL for the keep-alive pinger; defaults to `RENDER_EXTERNAL_URL` (set by Render), empty locally |
 | `VITE_API_URL` | frontend build | Backend origin; leave empty when `/api` is proxied (dev server, Vercel) |
 | `VITE_WS_URL` | frontend build | Live quiz WebSocket, e.g. `wss://<backend>/ws`; leave empty in dev (Vite proxies `/ws`) |
+| `VITE_DEMO_EMAIL`, `VITE_DEMO_PASSWORD` | frontend build | Optional. Shows a "Use demo account" button on the login page. These values end up in the public JS bundle, so use them only for the demo account; locally put them in `frontend/.env.local` |
 
 ## Deploy
 
@@ -177,7 +210,9 @@ The repository contains the configuration for a free deployment:
   [`frontend/vercel.json`](frontend/vercel.json) rewrites `/api/*` to the Render URL and every
   other path to `index.html` (client-side routing). Set `CORS_ALLOWED_ORIGINS` on Render to
   the Vercel URL, and `VITE_WS_URL=wss://<render host>/ws` on Vercel for the live quiz (the
-  WebSocket handshake is checked against the same allowed origins).
+  WebSocket handshake is checked against the same allowed origins). Set `VITE_DEMO_EMAIL` and
+  `VITE_DEMO_PASSWORD` on Vercel to the same values as `DEMO_EMAIL` / `DEMO_PASSWORD` on
+  Render to show the demo button.
 
 ### Keep-alive switch (admin)
 

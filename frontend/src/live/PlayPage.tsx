@@ -2,7 +2,9 @@ import { useMutation } from '@tanstack/react-query'
 import { useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router'
 import { AuthCard, Field, FormError, SubmitButton } from '../components/form'
-import { button, card, input } from '../components/ui'
+import { Icon } from '../components/Icon'
+import { ColdStartHint, EmptyState, Spinner } from '../components/states'
+import { button, card, input, muted } from '../components/ui'
 import { problemOf } from '../lib/api'
 import type { AnswerValue, LiveQuestion, LiveState } from '../lib/types'
 import { forgetSeat, loadSeat, playerApi, type Seat } from './api'
@@ -62,7 +64,7 @@ function JoinForm({ pin: initialPin, onJoined }: { pin: string; onJoined: (seat:
   const valid = /^\d{6}$/.test(pin.trim()) && nickname.trim().length > 0 && nickname.trim().length <= 20
 
   return (
-    <AuthCard title="Chơi quiz trực tiếp">
+    <AuthCard title="Chơi quiz trực tiếp" description="Nhập mã PIN trên màn hình của thầy cô.">
       <form
         className="space-y-4"
         noValidate
@@ -91,6 +93,7 @@ function JoinForm({ pin: initialPin, onJoined }: { pin: string; onJoined: (seat:
           onChange={(e) => setNickname(e.target.value)}
         />
         <SubmitButton pending={join.isPending}>Vào phòng</SubmitButton>
+        {join.isPending && <ColdStartHint />}
       </form>
     </AuthCard>
   )
@@ -103,19 +106,27 @@ function Game({ pin, seat, onLeave }: { pin: string; seat: Seat; onLeave: () => 
   if (live.error && !s) {
     return (
       <LiveShell>
-        <div className={`${card} space-y-3`}>
-          <p className="text-slate-700">Phòng không còn tồn tại.</p>
-          <button type="button" className={button.secondary} onClick={onLeave}>
-            Vào phòng khác
-          </button>
-        </div>
+        <EmptyState
+          icon="play"
+          title="Phòng không còn tồn tại"
+          description="Trò chơi có thể đã kết thúc. Hỏi thầy cô mã PIN mới."
+          action={
+            <button type="button" className={button('primary', 'sm')} onClick={onLeave}>
+              Vào phòng khác
+            </button>
+          }
+        />
       </LiveShell>
     )
   }
   if (!s) {
     return (
       <LiveShell>
-        <p className="text-slate-500">Đang tải…</p>
+        <div role="status" className="flex flex-col items-center gap-3 py-12 text-ink-muted">
+          <Spinner className="size-8" />
+          Đang vào phòng…
+          <ColdStartHint />
+        </div>
       </LiveShell>
     )
   }
@@ -124,26 +135,29 @@ function Game({ pin, seat, onLeave }: { pin: string; seat: Seat; onLeave: () => 
   if (!me) {
     return (
       <LiveShell>
-        <div className={`${card} space-y-3`}>
-          <p className="text-slate-700">Thầy cô đã mời bạn ra khỏi phòng.</p>
-          <button type="button" className={button.secondary} onClick={onLeave}>
-            Vào phòng khác
-          </button>
-        </div>
+        <EmptyState
+          icon="users"
+          title="Bạn đã được mời ra khỏi phòng"
+          action={
+            <button type="button" className={button('primary', 'sm')} onClick={onLeave}>
+              Vào phòng khác
+            </button>
+          }
+        />
       </LiveShell>
     )
   }
 
   return (
     <LiveShell>
-      <header className="flex items-center justify-between gap-3">
+      <header className={`${card} flex items-center justify-between gap-3`}>
         <div className="min-w-0">
-          <p className="text-sm font-semibold text-blue-600">SmartTeach</p>
-          <p className="truncate font-semibold text-slate-900">{me.nickname}</p>
+          <p className={muted}>Biệt danh</p>
+          <p className="truncate font-semibold text-ink">{me.nickname}</p>
         </div>
         <div className="text-right">
-          <p className="text-2xl font-bold text-slate-900">{me.score}</p>
-          <p className="text-xs text-slate-500">
+          <p className="text-2xl font-bold text-ink">{me.score}</p>
+          <p className="text-xs text-ink-muted">
             {s.question ? `Câu ${s.question.position + 1} / ${s.questionCount}` : 'điểm'}
             {!live.connected && ' · đang kết nối lại…'}
           </p>
@@ -152,8 +166,8 @@ function Game({ pin, seat, onLeave }: { pin: string; seat: Seat; onLeave: () => 
 
       {s.status === 'lobby' && (
         <div className={`${card} space-y-2 text-center`}>
-          <p className="text-lg font-semibold text-slate-900">Bạn đã vào phòng!</p>
-          <p className="text-slate-600">Chờ thầy cô bắt đầu… ({s.players.length} người chơi)</p>
+          <p className="text-heading text-ink">Bạn đã vào phòng!</p>
+          <p className="text-ink-muted">Chờ thầy cô bắt đầu… ({s.players.length} người chơi)</p>
         </div>
       )}
       {s.status === 'question' && s.question && (
@@ -163,9 +177,9 @@ function Game({ pin, seat, onLeave }: { pin: string; seat: Seat; onLeave: () => 
       {s.status === 'ended' && (
         <section className="space-y-4">
           <div className={`${card} text-center`}>
-            <p className="text-slate-600">Kết thúc! Bạn xếp hạng</p>
-            <p className="text-5xl font-bold text-blue-600">#{me.rank}</p>
-            <p className="text-slate-600">với {me.score} điểm</p>
+            <p className="text-ink-muted">Kết thúc! Bạn xếp hạng</p>
+            <p className="text-display text-primary">#{me.rank}</p>
+            <p className="text-ink-muted">với {me.score} điểm</p>
           </div>
           <Leaderboard players={s.players} limit={10} highlightId={seat.playerId} />
         </section>
@@ -216,14 +230,19 @@ function AnswerPanel({
   return (
     <section className="space-y-4">
       <div className={`${card} flex items-center gap-4`}>
-        <p className="flex-1 text-lg font-semibold text-slate-900">{question.prompt}</p>
+        <h1 className="flex-1 text-lg font-semibold text-ink">{question.prompt}</h1>
         <Countdown seconds={seconds} />
       </div>
 
       {sent ? (
-        <div className={`${card} text-center text-slate-700`}>Đã gửi câu trả lời. Chờ đáp án…</div>
+        <div role="status" className={`${card} flex items-center justify-center gap-2 text-ink`}>
+          <Icon name="check" className="text-success" />
+          Đã gửi câu trả lời. Chờ đáp án…
+        </div>
       ) : closed ? (
-        <div className={`${card} text-center text-slate-700`}>Hết giờ!</div>
+        <div role="status" className={`${card} text-center font-semibold text-ink`}>
+          Hết giờ!
+        </div>
       ) : question.kind === 'short_text' ? (
         <form
           className="space-y-3"
@@ -240,13 +259,13 @@ function AnswerPanel({
             value={text}
             onChange={(e) => setText(e.target.value)}
           />
-          <button type="submit" className={`${button.primary} w-full py-3`} disabled={disabled || !text.trim()}>
+          <button type="submit" className={`${button('primary')} w-full`} disabled={disabled || !text.trim()}>
             Gửi
           </button>
         </form>
       ) : question.kind === 'multi' ? (
         <div className="space-y-3">
-          <p className="text-sm text-slate-500">Chọn tất cả đáp án đúng rồi bấm Gửi.</p>
+          <p className={muted}>Chọn tất cả đáp án đúng rồi bấm Gửi.</p>
           <div className="grid grid-cols-2 gap-3">
             {question.options.map((label, i) => {
               const on = chosen.includes(i)
@@ -256,8 +275,8 @@ function AnswerPanel({
                   type="button"
                   aria-pressed={on}
                   disabled={disabled}
-                  className={`${optionColors[i % optionColors.length]} min-h-20 rounded-2xl p-3 text-left font-semibold text-white ${
-                    on ? 'ring-4 ring-slate-900' : 'opacity-80'
+                  className={`${optionColors[i % optionColors.length]} min-h-20 rounded-lg p-3 text-left font-semibold text-white ${
+                    on ? 'ring-4 ring-ink ring-offset-2' : 'opacity-80'
                   }`}
                   onClick={() => setChosen(on ? chosen.filter((x) => x !== i) : [...chosen, i].sort((a, b) => a - b))}
                 >
@@ -269,7 +288,7 @@ function AnswerPanel({
           </div>
           <button
             type="button"
-            className={`${button.primary} w-full py-3`}
+            className={`${button('primary')} w-full`}
             disabled={disabled || chosen.length === 0}
             onClick={() => send.mutate(chosen)}
           >
@@ -283,7 +302,7 @@ function AnswerPanel({
               key={i}
               type="button"
               disabled={disabled}
-              className={`${optionColors[i % optionColors.length]} min-h-24 rounded-2xl p-3 text-left text-lg font-semibold text-white hover:brightness-110`}
+              className={`${optionColors[i % optionColors.length]} min-h-24 rounded-lg p-3 text-left text-lg font-semibold text-white hover:brightness-110 disabled:opacity-60`}
               onClick={() => send.mutate(i)}
             >
               {optionLetter(i)}. {label}
@@ -302,14 +321,18 @@ function RevealPanel({ question, state, playerId }: { question: LiveQuestion; st
   const right = points != null && points > 0
   return (
     <section className="space-y-4">
-      <div className={`${card} space-y-1 text-center ${right ? 'ring-2 ring-emerald-500' : 'ring-2 ring-red-300'}`}>
-        <p className={`text-3xl font-bold ${right ? 'text-emerald-600' : points == null ? 'text-slate-700' : 'text-red-600'}`}>
+      <div
+        className={`space-y-1 rounded-md border-2 bg-surface p-5 text-center shadow-card ${
+          right ? 'border-success' : 'border-danger/40'
+        }`}
+      >
+        <p className={`text-3xl font-bold ${right ? 'text-success' : points == null ? 'text-ink' : 'text-danger'}`}>
           {right ? `Chính xác! +${points}` : points == null ? 'Hết giờ, bạn chưa trả lời' : 'Chưa đúng'}
         </p>
-        <p className="text-slate-600">
-          Đáp án: <span className="font-semibold text-slate-900">{correctAnswerText(question)}</span>
+        <p className="text-ink-muted">
+          Đáp án: <span className="font-semibold text-ink">{correctAnswerText(question)}</span>
         </p>
-        {me && <p className="text-sm text-slate-500">Bạn đang xếp hạng #{me.rank}</p>}
+        {me && <p className={muted}>Bạn đang xếp hạng #{me.rank}</p>}
       </div>
       <Leaderboard players={state.players} limit={5} highlightId={playerId} />
     </section>

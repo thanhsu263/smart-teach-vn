@@ -39,11 +39,7 @@ export const assignmentApi = {
 
 export const statusLabel = { draft: 'Nháp', published: 'Đã giao', closed: 'Đã đóng' } as const
 
-export const statusClass = {
-  draft: 'bg-slate-100 text-slate-700',
-  published: 'bg-green-100 text-green-800',
-  closed: 'bg-amber-100 text-amber-800',
-} as const
+export const statusTone = { draft: 'neutral', published: 'success', closed: 'warning' } as const
 
 /** Link the teacher shares with the class; the student still needs their own access code. */
 export const studentLink = (publicCode: string) => `${window.location.origin}/s/${publicCode}`

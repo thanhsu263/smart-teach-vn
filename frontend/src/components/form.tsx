@@ -1,46 +1,81 @@
 import type { InputHTMLAttributes, ReactNode } from 'react'
+import { button, input, label as labelClass } from './ui'
 
 interface FieldProps extends InputHTMLAttributes<HTMLInputElement> {
   label: string
   error?: string
+  hint?: string
 }
 
-export function Field({ label, error, id, ...input }: FieldProps) {
+/** Label + input + error. The error is linked with aria-describedby so screen readers read it. */
+export function Field({ label, error, hint, id, ...props }: FieldProps) {
+  const describedBy = error ? `${id}-error` : hint ? `${id}-hint` : undefined
   return (
-    <div className="space-y-1">
-      <label htmlFor={id} className="block text-sm font-medium text-slate-700">
+    <div className="space-y-1.5">
+      <label htmlFor={id} className={labelClass}>
         {label}
       </label>
       <input
         id={id}
         aria-invalid={error ? true : undefined}
-        className="w-full rounded-lg border border-slate-300 px-3 py-2 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-200 aria-invalid:border-red-500"
-        {...input}
+        aria-describedby={describedBy}
+        className={input}
+        {...props}
       />
-      {error && <p className="text-sm text-red-600">{error}</p>}
+      {error ? (
+        <p id={`${id}-error`} className="text-sm text-danger">
+          {error}
+        </p>
+      ) : (
+        hint && (
+          <p id={`${id}-hint`} className="text-sm text-ink-muted">
+            {hint}
+          </p>
+        )
+      )}
     </div>
   )
 }
 
-export function AuthCard({ title, children }: { title: string; children: ReactNode }) {
+export function Logo({ inverse = false, className = '' }: { inverse?: boolean; className?: string }) {
   return (
-    <main className="grid min-h-screen place-items-center bg-slate-50 px-4">
-      <div className="w-full max-w-sm rounded-2xl bg-white p-8 shadow-sm ring-1 ring-slate-200">
-        <p className="mb-1 text-sm font-semibold text-blue-600">SmartTeach</p>
-        <h1 className="mb-6 text-2xl font-bold text-slate-900">{title}</h1>
-        {children}
+    <span className={`inline-flex items-center gap-2 font-bold ${inverse ? 'text-white' : 'text-brand'} ${className}`}>
+      <span aria-hidden="true" className="grid size-8 place-items-center rounded-sm bg-primary text-white">
+        S
+      </span>
+      SmartTeach
+    </span>
+  )
+}
+
+/** Centered card used by sign-in, sign-up and the student entry pages. */
+export function AuthCard({
+  title,
+  description,
+  children,
+  footer,
+}: {
+  title: string
+  description?: ReactNode
+  children: ReactNode
+  footer?: ReactNode
+}) {
+  return (
+    <main className="flex min-h-screen flex-col items-center justify-center gap-6 px-4 py-10">
+      <Logo className="text-lg" />
+      <div className="w-full max-w-md rounded-lg border border-border bg-surface p-6 shadow-raised sm:p-8">
+        <h1 className="text-2xl font-bold text-ink">{title}</h1>
+        {description && <p className="mt-1 text-ink-muted">{description}</p>}
+        <div className="mt-6">{children}</div>
       </div>
+      {footer && <div className="text-center text-sm text-ink-muted">{footer}</div>}
     </main>
   )
 }
 
 export function SubmitButton({ pending, children }: { pending: boolean; children: ReactNode }) {
   return (
-    <button
-      type="submit"
-      disabled={pending}
-      className="w-full rounded-lg bg-blue-600 px-4 py-2 font-medium text-white hover:bg-blue-700 disabled:opacity-60"
-    >
+    <button type="submit" disabled={pending} className={`${button('primary')} w-full`}>
       {pending ? 'Đang xử lý…' : children}
     </button>
   )
@@ -49,7 +84,7 @@ export function SubmitButton({ pending, children }: { pending: boolean; children
 export function FormError({ message }: { message?: string }) {
   if (!message) return null
   return (
-    <p role="alert" className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">
+    <p role="alert" className="rounded-sm border border-danger/30 bg-danger/5 px-3 py-2.5 text-sm text-danger">
       {message}
     </p>
   )
