@@ -4,6 +4,7 @@ import { useForm } from 'react-hook-form'
 import { useNavigate, useParams } from 'react-router'
 import { z } from 'zod'
 import { AuthCard, Field, FormError, SubmitButton } from '../components/form'
+import { ColdStartHint } from '../components/states'
 import { problemOf } from '../lib/api'
 import { studentApi } from './api'
 
@@ -39,7 +40,7 @@ export function StartPage() {
         : 'Không vào được bài, hãy thử lại.'
 
   return (
-    <AuthCard title="Làm bài tập">
+    <AuthCard title="Làm bài tập" description="Nhập mã bài và mã học sinh thầy cô đã phát.">
       <form onSubmit={handleSubmit((form) => start.mutate(form))} className="space-y-4" noValidate>
         <FormError message={error} />
         <Field
@@ -51,13 +52,14 @@ export function StartPage() {
         />
         <Field
           id="accessCode"
-          label="Mã học sinh (thầy cô đã phát)"
+          label="Mã học sinh"
           autoComplete="off"
           autoFocus={code !== ''}
           error={formState.errors.accessCode?.message}
           {...register('accessCode')}
         />
         <SubmitButton pending={start.isPending}>Vào làm bài</SubmitButton>
+        {start.isPending && <ColdStartHint />}
       </form>
     </AuthCard>
   )
