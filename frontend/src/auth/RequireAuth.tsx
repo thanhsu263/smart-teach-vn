@@ -1,4 +1,5 @@
 import { Navigate, Outlet, useLocation } from 'react-router'
+import { FullPageLoading } from '../components/states'
 import { useAuth } from './auth-context'
 
 /** Protected routes: wait for session restore, then send anonymous users to /login. */
@@ -6,7 +7,7 @@ export function RequireAuth() {
   const { user, loading } = useAuth()
   const location = useLocation()
 
-  if (loading) return <FullPageMessage text="Đang tải…" />
+  if (loading) return <FullPageLoading />
   if (!user) return <Navigate to="/login" replace state={{ from: location.pathname }} />
   return <Outlet />
 }
@@ -15,11 +16,8 @@ export function RequireAuth() {
 export function GuestOnly() {
   const { user, loading } = useAuth()
 
-  if (loading) return <FullPageMessage text="Đang tải…" />
+  if (loading) return <FullPageLoading />
   if (user) return <Navigate to="/" replace />
   return <Outlet />
 }
 
-function FullPageMessage({ text }: { text: string }) {
-  return <div className="grid min-h-screen place-items-center text-slate-500">{text}</div>
-}

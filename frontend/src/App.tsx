@@ -1,59 +1,73 @@
 import { createBrowserRouter, Navigate, RouterProvider } from 'react-router'
-import { AdminPage } from './admin/AdminPage'
-import { AssignmentDetailPage } from './assignments/AssignmentDetailPage'
-import { AssignmentEditorPage } from './assignments/AssignmentEditorPage'
-import { AssignmentsPage } from './assignments/AssignmentsPage'
 import { GuestOnly, RequireAuth } from './auth/RequireAuth'
-import { ClassDetailPage } from './classes/ClassDetailPage'
-import { ClassesPage } from './classes/ClassesPage'
 import { AppLayout } from './components/AppLayout'
-import { HostPage } from './live/HostPage'
-import { PlayPage } from './live/PlayPage'
 import { LoginPage } from './pages/LoginPage'
 import { RegisterPage } from './pages/RegisterPage'
-import { QuizEditorPage } from './quizzes/QuizEditorPage'
-import { QuizzesPage } from './quizzes/QuizzesPage'
 import { AttemptPage } from './student/AttemptPage'
 import { StartPage } from './student/StartPage'
 
+// Pages people open straight from a link (login, a student's code) are in the main bundle, so they
+// render after one download. Pages reached inside the teacher app, and the live quiz with its
+// WebSocket client, load on demand.
+const pages = {
+  classes: () => import('./classes/ClassesPage').then((m) => ({ Component: m.ClassesPage })),
+  classDetail: () => import('./classes/ClassDetailPage').then((m) => ({ Component: m.ClassDetailPage })),
+  quizzes: () => import('./quizzes/QuizzesPage').then((m) => ({ Component: m.QuizzesPage })),
+  quizEditor: () => import('./quizzes/QuizEditorPage').then((m) => ({ Component: m.QuizEditorPage })),
+  assignments: () => import('./assignments/AssignmentsPage').then((m) => ({ Component: m.AssignmentsPage })),
+  assignmentEditor: () =>
+    import('./assignments/AssignmentEditorPage').then((m) => ({ Component: m.AssignmentEditorPage })),
+  assignmentDetail: () =>
+    import('./assignments/AssignmentDetailPage').then((m) => ({ Component: m.AssignmentDetailPage })),
+  admin: () => import('./admin/AdminPage').then((m) => ({ Component: m.AdminPage })),
+  host: () => import('./live/HostPage').then((m) => ({ Component: m.HostPage })),
+  play: () => import('./live/PlayPage').then((m) => ({ Component: m.PlayPage })),
+}
+
 const router = createBrowserRouter([
   {
-    element: <GuestOnly />,
-    children: [
-      { path: '/login', element: <LoginPage /> },
-      { path: '/register', element: <RegisterPage /> },
-    ],
-  },
-  {
-    element: <RequireAuth />,
+    // Shown only while the code for a lazy page opened directly is downloading.
+    hydrateFallbackElement: <div className="min-h-screen" />,
     children: [
       {
-        element: <AppLayout />,
+        element: <GuestOnly />,
         children: [
-          { path: '/', element: <Navigate to="/classes" replace /> },
-          { path: '/classes', element: <ClassesPage /> },
-          { path: '/classes/:id', element: <ClassDetailPage /> },
-          { path: '/quizzes', element: <QuizzesPage /> },
-          { path: '/quizzes/new', element: <QuizEditorPage /> },
-          { path: '/quizzes/:id', element: <QuizEditorPage /> },
-          { path: '/assignments', element: <AssignmentsPage /> },
-          { path: '/assignments/new', element: <AssignmentEditorPage /> },
-          { path: '/assignments/:id', element: <AssignmentDetailPage /> },
-          { path: '/assignments/:id/edit', element: <AssignmentEditorPage /> },
-          { path: '/admin', element: <AdminPage /> },
+          { path: '/login', element: <LoginPage /> },
+          { path: '/register', element: <RegisterPage /> },
         ],
       },
-      // Full screen for the projector, without the app menu.
-      { path: '/live/:pin', element: <HostPage /> },
+      {
+        element: <RequireAuth />,
+        children: [
+          {
+            element: <AppLayout />,
+            children: [
+              { path: '/', element: <Navigate to="/classes" replace /> },
+              { path: '/classes', lazy: pages.classes },
+              { path: '/classes/:id', lazy: pages.classDetail },
+              { path: '/quizzes', lazy: pages.quizzes },
+              { path: '/quizzes/new', lazy: pages.quizEditor },
+              { path: '/quizzes/:id', lazy: pages.quizEditor },
+              { path: '/assignments', lazy: pages.assignments },
+              { path: '/assignments/new', lazy: pages.assignmentEditor },
+              { path: '/assignments/:id', lazy: pages.assignmentDetail },
+              { path: '/assignments/:id/edit', lazy: pages.assignmentEditor },
+              { path: '/admin', lazy: pages.admin },
+            ],
+          },
+          // Full screen for the projector, without the app menu.
+          { path: '/live/:pin', lazy: pages.host },
+        ],
+      },
+      // Students: no account, open even when a teacher is logged in on the same browser.
+      { path: '/s', element: <StartPage /> },
+      { path: '/s/:code', element: <StartPage /> },
+      { path: '/attempts/:id', element: <AttemptPage /> },
+      { path: '/play', lazy: pages.play },
+      { path: '/play/:pin', lazy: pages.play },
+      { path: '*', element: <Navigate to="/" replace /> },
     ],
   },
-  // Students: no account, open even when a teacher is logged in on the same browser.
-  { path: '/s', element: <StartPage /> },
-  { path: '/s/:code', element: <StartPage /> },
-  { path: '/attempts/:id', element: <AttemptPage /> },
-  { path: '/play', element: <PlayPage /> },
-  { path: '/play/:pin', element: <PlayPage /> },
-  { path: '*', element: <Navigate to="/" replace /> },
 ])
 
 export default function App() {
