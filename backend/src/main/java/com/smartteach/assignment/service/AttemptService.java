@@ -24,6 +24,7 @@ import com.smartteach.common.security.Hashing;
 import com.smartteach.quiz.dto.OptionResponse;
 import com.smartteach.quiz.dto.QuestionResponse;
 import com.smartteach.quiz.service.Grading;
+import io.micrometer.core.instrument.MeterRegistry;
 import java.security.SecureRandom;
 import java.time.Clock;
 import java.time.Duration;
@@ -59,6 +60,7 @@ public class AttemptService {
     private final StudentRepository studentRepository;
     private final QuizSnapshots snapshots;
     private final Clock clock;
+    private final MeterRegistry meterRegistry;
 
     /**
      * One attempt per student: if they already have one (in progress or submitted) it is reused
@@ -139,6 +141,7 @@ public class AttemptService {
         if (attempt.getStatus() == AttemptStatus.IN_PROGRESS) {
             checkCanAnswer(attempt, assignment, now);
             grade(attempt, snapshots.read(assignment.getQuizSnapshot()).questions(), now);
+            meterRegistry.counter("smartteach.attempts.submitted").increment();
         }
         return toResult(attempt, assignment, now);
     }

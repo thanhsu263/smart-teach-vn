@@ -89,3 +89,18 @@ export function FormError({ message }: { message?: string }) {
     </p>
   )
 }
+
+/** Shown when a save is refused with 409 because the item was saved elsewhere (another tab). */
+export function ConflictError({ message, onReload, reloading }: { message: string; onReload: () => void; reloading: boolean }) {
+  return (
+    <div
+      role="alert"
+      className="flex flex-wrap items-center justify-between gap-3 rounded-sm border border-danger/30 bg-danger/5 px-3 py-2.5 text-sm text-danger"
+    >
+      <span>{message}</span>
+      <button type="button" className={button('secondary', 'sm')} onClick={onReload} disabled={reloading}>
+        {reloading ? 'Đang tải…' : 'Tải lại'}
+      </button>
+    </div>
+  )
+}

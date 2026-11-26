@@ -1,8 +1,10 @@
 import { createBrowserRouter, Navigate, RouterProvider } from 'react-router'
 import { GuestOnly, RequireAuth } from './auth/RequireAuth'
 import { AppLayout } from './components/AppLayout'
+import { ForgotPasswordPage } from './pages/ForgotPasswordPage'
 import { LoginPage } from './pages/LoginPage'
 import { RegisterPage } from './pages/RegisterPage'
+import { ResetPasswordPage } from './pages/ResetPasswordPage'
 import { AttemptPage } from './student/AttemptPage'
 import { StartPage } from './student/StartPage'
 
@@ -59,6 +61,9 @@ const router = createBrowserRouter([
           { path: '/live/:pin', lazy: pages.host },
         ],
       },
+      // Opened from the reset mail, so they work whether or not someone is logged in on this browser.
+      { path: '/forgot-password', element: <ForgotPasswordPage /> },
+      { path: '/reset-password', element: <ResetPasswordPage /> },
       // Students: no account, open even when a teacher is logged in on the same browser.
       { path: '/s', element: <StartPage /> },
       { path: '/s/:code', element: <StartPage /> },

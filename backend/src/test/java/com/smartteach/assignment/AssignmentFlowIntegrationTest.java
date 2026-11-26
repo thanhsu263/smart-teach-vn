@@ -16,6 +16,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import com.jayway.jsonpath.JsonPath;
 import com.smartteach.IntegrationTest;
 import com.smartteach.assignment.service.AttemptRetentionJob;
+import io.micrometer.core.instrument.MeterRegistry;
 import jakarta.persistence.EntityManagerFactory;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
@@ -55,10 +56,14 @@ class AssignmentFlowIntegrationTest extends IntegrationTest {
     @Autowired
     AttemptRetentionJob retentionJob;
 
+    @Autowired
+    MeterRegistry meterRegistry;
+
     @Test
     void fullFlowFromPublishToAnalytics() throws Exception {
         Setup s = setUp("immediate");
         String code = publish(s);
+        double submittedBefore = meterRegistry.counter("smartteach.attempts.submitted").count();
 
         // Student 1: everything right, short text typed without accents and in lowercase.
         Started an = start(code, s.codes.get(0));
@@ -105,6 +110,8 @@ class AssignmentFlowIntegrationTest extends IntegrationTest {
                 .andExpect(jsonPath("$.questions[3].answer").doesNotExist());
         attempt(get("/api/public/attempts/" + binh.id + "/result"), binh.token)
                 .andExpect(status().isOk()).andExpect(jsonPath("$.score").value(25));
+        // Two real submissions; the repeated submit is not counted again.
+        assertThat(meterRegistry.counter("smartteach.attempts.submitted").count()).isEqualTo(submittedBefore + 2);
 
         // Editing the quiz after publishing does not change the assignment (it uses the snapshot).
         perform(s.teacher, put("/api/quizzes/" + s.quizId), """
@@ -228,6 +235,22 @@ class AssignmentFlowIntegrationTest extends IntegrationTest {
                 .andExpect(jsonPath("$.answers").isEmpty());
         assertThat(jdbc.queryForObject("SELECT status FROM attempts WHERE id = ?", String.class, old.id))
                 .isEqualTo("invalidated");
+    }
+
+    @Test
+    void staleAssignmentSaveIsRefusedWith409() throws Exception {
+        Setup s = setUp("immediate");
+        String base = "/api/assignments/" + s.assignmentId;
+        String stale = assignmentJson(s, "immediate", null).replace("}", ", \"version\": 0}");
+
+        perform(s.teacher, put(base), stale)
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.version").value(1));
+        perform(s.teacher, put(base), stale).andExpect(status().isConflict());
+        // Publishing is a change too: it bumps the version that the editor must send next.
+        perform(s.teacher, post(base + "/publish"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.version").value(2));
     }
 
     @Test

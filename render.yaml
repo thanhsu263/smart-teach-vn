@@ -17,8 +17,9 @@ services:
       paths:
         - backend/**
     envVars:
+      # demo: recreate the demo data on start; prod: JSON logs.
       - key: SPRING_PROFILES_ACTIVE
-        value: demo
+        value: demo,prod
       # jdbc:postgresql://<host>/<db>?sslmode=require (Neon's direct host, not the "-pooler" one)
       - key: DB_URL
         sync: false
@@ -50,4 +51,16 @@ services:
       - key: DEMO_EMAIL
         value: demo@smartteach.vn
       - key: DEMO_PASSWORD
+        sync: false
+      # Password reset mails. Render's free plan blocks outgoing SMTP, so mail goes through
+      # Brevo's HTTPS API; MAIL_FROM must be a sender verified in Brevo.
+      - key: BREVO_API_KEY
+        sync: false
+      - key: MAIL_FROM
+        sync: false
+      # Base of the link in the reset mail.
+      - key: APP_FRONTEND_URL
+        value: https://smart-teach-vn.vercel.app
+      # HTTP Basic password of the "prometheus" user for /actuator/prometheus (empty = closed).
+      - key: METRICS_PASSWORD
         sync: false

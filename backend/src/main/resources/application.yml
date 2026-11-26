@@ -1,4 +1,8 @@
 spring:
+  mail:
+    # Local: Mailpit from docker-compose (inbox at http://localhost:8025). Not used when BREVO_API_KEY is set.
+    host: ${MAIL_HOST:localhost}
+    port: ${MAIL_PORT:1025}
   application:
     name: smartteach
   config:
@@ -29,22 +33,44 @@ spring:
 server:
   # PORT is set by hosts such as Render.
   port: ${SERVER_PORT:${PORT:8080}}
+  # Behind Render's proxy: take the client IP from X-Forwarded-For (rate limits are per IP).
+  # Tomcat only trusts that header when it comes from a private-network address.
+  forward-headers-strategy: native
 
 management:
   endpoints:
     web:
       exposure:
-        include: health
+        # /actuator/prometheus needs HTTP Basic (user "prometheus", METRICS_PASSWORD), see SecurityConfig.
+        include: health,prometheus
   endpoint:
     health:
       probes:
         enabled: true
+  health:
+    mail:
+      # Mail is optional (Brevo in production, Mailpit locally); it must not mark the app DOWN.
+      enabled: false
+
+logging:
+  pattern:
+    # Request id from RequestIdFilter in every plain-text log line ("[-]" outside requests).
+    correlation: "[%X{requestId:-}] "
 
 springdoc:
   swagger-ui:
     path: /swagger-ui.html
 
 app:
+  mail:
+    from: ${MAIL_FROM:no-reply@smartteach.local}
+    # Set in production: Render's free plan blocks SMTP, so mail goes through Brevo's HTTPS API.
+    brevo-api-key: ${BREVO_API_KEY:}
+    # Frontend address used in email links (password reset).
+    link-base-url: ${APP_FRONTEND_URL:http://localhost:5173}
+  metrics:
+    # Password for the "prometheus" user on /actuator/prometheus; blank = endpoint closed.
+    password: ${METRICS_PASSWORD:}
   auth:
     # HS256 signing key, at least 32 bytes. Required; the app refuses to start without it.
     jwt-secret: ${JWT_SECRET:}
@@ -69,3 +95,16 @@ app:
     # Render sets RENDER_EXTERNAL_URL itself; empty locally, so the job does nothing.
     url: ${KEEP_ALIVE_URL:${RENDER_EXTERNAL_URL:}}
     interval-minutes: 10
+  rate-limit:
+    enabled: ${RATE_LIMIT_ENABLED:true}
+    # capacity requests per period, refilled smoothly. Over the limit: 429 + Retry-After.
+    rules:
+      auth-ip: { capacity: 30, period: 1m }
+      login: { capacity: 5, period: 1m }
+      register: { capacity: 5, period: 1h }
+      refresh: { capacity: 60, period: 1m }
+      forgot-password: { capacity: 3, period: 15m }
+      reset-password: { capacity: 10, period: 15m }
+      # A class of 40+ students can share one school IP.
+      student-start: { capacity: 120, period: 1m }
+      live-join: { capacity: 120, period: 1m }

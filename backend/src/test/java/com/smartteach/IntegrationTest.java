@@ -10,6 +10,7 @@ import com.smartteach.user.repository.UserRepository;
 import java.time.Instant;
 import java.util.UUID;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.micrometer.metrics.test.autoconfigure.AutoConfigureMetrics;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.context.annotation.Import;
@@ -28,8 +29,10 @@ import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilde
 // A real port so the live quiz tests can also connect over WebSocket.
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 @AutoConfigureMockMvc
+// Tests turn metric export off by default; MetricsIntegrationTest reads /actuator/prometheus.
+@AutoConfigureMetrics
 @ActiveProfiles("test")
-@Import(TestcontainersConfiguration.class)
+@Import({TestcontainersConfiguration.class, TestMailConfiguration.class})
 public abstract class IntegrationTest {
 
     @Autowired

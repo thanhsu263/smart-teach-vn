@@ -7,6 +7,9 @@ import org.springframework.http.HttpStatus;
 @Getter
 public class ApiException extends RuntimeException {
 
+    /** The frontend shows its own "edited in another tab, reload" message for this 409. */
+    public static final String MODIFIED_ELSEWHERE = "Modified elsewhere, reload and try again";
+
     private final HttpStatus status;
 
     public ApiException(HttpStatus status, String message) {
@@ -28,5 +31,15 @@ public class ApiException extends RuntimeException {
 
     public static ApiException conflict(String message) {
         return new ApiException(HttpStatus.CONFLICT, message);
+    }
+
+    /**
+     * Optimistic locking: refuses a save based on an older version. Null means the client did not
+     * send one (scripts, old clients) and the save simply overwrites.
+     */
+    public static void checkVersion(Long expected, long actual) {
+        if (expected != null && expected != actual) {
+            throw conflict(MODIFIED_ELSEWHERE);
+        }
     }
 }

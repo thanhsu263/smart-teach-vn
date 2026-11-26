@@ -76,8 +76,13 @@ public class QuizService {
         checkRules(request);
         Quiz quiz = quizRepository.findByIdAndOwnerIdForUpdate(quizId, ownerId)
                 .orElseThrow(QuizService::quizNotFound);
+        // The row lock makes saves wait for each other; the version check catches a save that
+        // was based on what another tab has since replaced.
+        ApiException.checkVersion(request.version(), quiz.getVersion());
         quiz.setTitle(request.title().strip());
         quiz.setUpdatedAt(clock.instant());
+        // Flush now so the response already carries the new version.
+        quizRepository.flush();
         // Delete first: the new questions reuse the positions, which are unique per quiz.
         questionRepository.deleteByQuizId(quizId);
         return mapper.toResponse(quiz, saveQuestions(quiz, request.questions()));

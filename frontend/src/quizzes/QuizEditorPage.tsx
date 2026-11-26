@@ -4,12 +4,12 @@ import { useEffect, useRef } from 'react'
 import { useFieldArray, useForm, useWatch, type UseFormReturn } from 'react-hook-form'
 import { Link, useBlocker, useLocation, useNavigate, useParams } from 'react-router'
 import { useConfirm } from '../components/confirm-context'
-import { FormError } from '../components/form'
+import { ConflictError, FormError } from '../components/form'
 import { Icon } from '../components/Icon'
 import { PageHeader } from '../components/page'
 import { EmptyState, ErrorState, Skeleton } from '../components/states'
 import { button, card, input, link, select, textarea } from '../components/ui'
-import { problemOf } from '../lib/api'
+import { isModifiedElsewhere, problemOf } from '../lib/api'
 import type { QuestionKind, Quiz } from '../lib/types'
 import { quizApi, quizKeys } from './api'
 import {
@@ -85,7 +85,7 @@ function QuizEditor({ quiz }: { quiz?: Quiz }) {
 
   const save = useMutation({
     mutationFn: (values: QuizForm) =>
-      quiz ? quizApi.update(quiz.id, toPayload(values)) : quizApi.create(toPayload(values)),
+      quiz ? quizApi.update(quiz.id, toPayload(values), quiz.version) : quizApi.create(toPayload(values)),
     onSuccess: (saved) => {
       queryClient.setQueryData(quizKeys.detail(saved.id), saved)
       void queryClient.invalidateQueries({ queryKey: quizKeys.lists })
@@ -105,13 +105,24 @@ function QuizEditor({ quiz }: { quiz?: Quiz }) {
     },
   })
 
+  // 409 from optimistic locking: load the copy saved elsewhere (this tab's edits are dropped).
+  const conflict = quiz !== undefined && isModifiedElsewhere(save.error)
+  const reload = useMutation({
+    mutationFn: () =>
+      queryClient.fetchQuery({ queryKey: quizKeys.detail(quiz!.id), queryFn: () => quizApi.get(quiz!.id), staleTime: 0 }),
+    onSuccess: (fresh) => {
+      reset(toForm(fresh))
+      save.reset()
+    },
+  })
+
   const invalidQuestions = Object.keys(formState.errors.questions ?? {})
     .filter((key) => /^\d+$/.test(key))
     .map((key) => Number(key) + 1)
 
   const saveError = (() => {
     if (invalidQuestions.length > 0) return `Còn lỗi ở câu ${invalidQuestions.join(', ')}.`
-    if (!save.error) return undefined
+    if (!save.error || conflict) return undefined
     const status = problemOf(save.error)?.status
     if (status === 409) return `Bạn đã có ${MAX_QUIZZES} quiz, hãy xoá bớt quiz cũ.`
     if (status === 404) return 'Quiz này không còn tồn tại.'
@@ -148,6 +159,13 @@ function QuizEditor({ quiz }: { quiz?: Quiz }) {
           </div>
         </div>
         <FormError message={saveError} />
+        {conflict && (
+          <ConflictError
+            message="Quiz đã được sửa ở nơi khác (tab hoặc máy khác). Tải lại để xem bản mới nhất; thay đổi chưa lưu ở đây sẽ mất."
+            onReload={() => reload.mutate()}
+            reloading={reload.isPending}
+          />
+        )}
         {arrayError(formState.errors.questions) && <FormError message={arrayError(formState.errors.questions)} />}
       </div>
 

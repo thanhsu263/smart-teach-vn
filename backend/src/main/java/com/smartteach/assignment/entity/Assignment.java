@@ -6,6 +6,7 @@ import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
+import jakarta.persistence.Version;
 import java.time.Instant;
 import lombok.AccessLevel;
 import lombok.Getter;
@@ -69,6 +70,11 @@ public class Assignment {
 
     @Column(name = "updated_at", nullable = false)
     private Instant updatedAt;
+
+    /** Bumped by Hibernate on every update; clients send back the version they loaded. */
+    @Version
+    @Setter(AccessLevel.NONE)
+    private long version;
 
     @Column(name = "closed_at")
     private Instant closedAt;

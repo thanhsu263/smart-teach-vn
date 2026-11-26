@@ -220,7 +220,7 @@ class AssignmentServiceTest {
     }
 
     private static QuizResponse quiz(List<QuestionResponse> questions) {
-        return new QuizResponse(QUIZ_ID, "Địa lý", NOW, NOW, questions);
+        return new QuizResponse(QUIZ_ID, 0, "Địa lý", NOW, NOW, questions);
     }
 
     private static QuestionResponse question() {

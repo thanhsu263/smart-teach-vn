@@ -7,8 +7,11 @@ import com.smartteach.assignment.dto.SavedAnswerResponse;
 import com.smartteach.assignment.dto.StartAttemptRequest;
 import com.smartteach.assignment.dto.StartAttemptResponse;
 import com.smartteach.assignment.service.AttemptService;
+import com.smartteach.common.ratelimit.RateLimitRule;
+import com.smartteach.common.ratelimit.RateLimiter;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -33,10 +36,13 @@ public class AttemptController {
     static final String TOKEN_HEADER = "X-Attempt-Token";
 
     private final AttemptService attemptService;
+    private final RateLimiter rateLimiter;
 
     @PostMapping("/assignments/{code}/start")
     @Operation(summary = "Start (or continue) an attempt with the student access code; returns the attempt token")
-    public StartAttemptResponse start(@PathVariable String code, @Valid @RequestBody StartAttemptRequest request) {
+    public StartAttemptResponse start(@PathVariable String code, @Valid @RequestBody StartAttemptRequest request,
+                                      HttpServletRequest http) {
+        rateLimiter.check(RateLimitRule.STUDENT_START, http.getRemoteAddr());
         return attemptService.start(code, request.accessCode());
     }
 

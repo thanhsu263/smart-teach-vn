@@ -85,6 +85,7 @@ public class AssignmentService {
     @Transactional
     public AssignmentResponse update(Long ownerId, Long assignmentId, AssignmentRequest request) {
         Assignment assignment = findOwnedForUpdate(ownerId, assignmentId);
+        ApiException.checkVersion(request.version(), assignment.getVersion());
         if (assignment.getStatus() == AssignmentStatus.CLOSED) {
             throw ApiException.conflict("A closed assignment cannot be edited");
         }
@@ -96,7 +97,7 @@ public class AssignmentService {
         checkSchedule(request, assignment.getDueAt());
         apply(ownerId, assignment, request);
         assignment.setUpdatedAt(clock.instant());
-        return toResponse(assignment);
+        return flushAndMap(assignment);
     }
 
     /** Attempts and answers go with it (ON DELETE CASCADE). */
@@ -126,7 +127,7 @@ public class AssignmentService {
         assignment.setQuizSnapshot(snapshots.write(new QuizSnapshot(quiz.title(), quiz.questions())));
         assignment.setStatus(AssignmentStatus.PUBLISHED);
         assignment.setUpdatedAt(now);
-        return toResponse(assignment);
+        return flushAndMap(assignment);
     }
 
     /** Stops all answering. Attempts still in progress stay unsubmitted. */
@@ -140,6 +141,12 @@ public class AssignmentService {
         assignment.setStatus(AssignmentStatus.CLOSED);
         assignment.setClosedAt(now);
         assignment.setUpdatedAt(now);
+        return flushAndMap(assignment);
+    }
+
+    /** Flushes first so the response already carries the new version. */
+    private AssignmentResponse flushAndMap(Assignment assignment) {
+        assignmentRepository.flush();
         return toResponse(assignment);
     }
 

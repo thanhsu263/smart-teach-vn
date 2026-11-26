@@ -5,7 +5,7 @@ import { AuthCard, Field, FormError, SubmitButton } from '../components/form'
 import { Icon } from '../components/Icon'
 import { ColdStartHint, EmptyState, Spinner } from '../components/states'
 import { button, card, input, muted } from '../components/ui'
-import { problemOf } from '../lib/api'
+import { problemOf, tooManyRequestsMessage } from '../lib/api'
 import type { AnswerValue, LiveQuestion, LiveState } from '../lib/types'
 import { forgetSeat, loadSeat, playerApi, type Seat } from './api'
 import { correctAnswerText, optionColors, optionLetter } from './options'
@@ -49,7 +49,9 @@ function JoinForm({ pin: initialPin, onJoined }: { pin: string; onJoined: (seat:
   const problem = problemOf(join.error)
   const error = !join.error
     ? undefined
-    : problem?.status === 404
+    : problem?.status === 429
+      ? tooManyRequestsMessage(join.error)
+      : problem?.status === 404
       ? 'Không có phòng nào với mã PIN này.'
       : problem?.status === 400
         ? 'Biệt danh phải có từ 1 đến 20 ký tự.'
