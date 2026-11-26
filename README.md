@@ -17,8 +17,7 @@ frontend. The UI is in Vietnamese; code, API and docs are in English.
 **Live demo:** https://smart-teach-vn.vercel.app · **API docs:**
 https://smartteach-api.onrender.com/swagger-ui.html
 
-Demo teacher account: `demo@smartteach.vn` / `DEMO_PASSWORD_HERE`, or press **Dùng tài
-khoản demo** on the login page. The demo data is recreated every time the backend starts, so
+To look around without registering, press **Dùng tài khoản demo** on the login page. The demo data is recreated every time the backend starts, so
 feel free to change anything.
 
 > The demo runs on free plans. The backend sleeps after 15 idle minutes, so the first request
@@ -91,6 +90,9 @@ Lighthouse (production build, simulated mobile throttling, median of 3 runs):
 - **Live quiz:** the teacher projects a game, students join from their phones with a PIN and a
   nickname, points depend on correctness and speed; state is pushed over WebSocket (STOMP).
 - **Data retention:** a nightly job deletes student attempts older than 90 days.
+- **Security & operations:** rate limits, password reset by email, optimistic locking,
+  request ids with JSON logs and Prometheus metrics, see
+  [Security & operations](#security--operations).
 
 ## Tech stack
 
@@ -149,7 +151,7 @@ Maven dependencies and takes a few minutes.
 ### Option B: backend from source (for development)
 
 ```bash
-docker compose up -d              # only PostgreSQL on localhost:5432 (database smartteach)
+docker compose up -d              # PostgreSQL on localhost:5432 + Mailpit (mail catcher)
 
 cd backend
 ./mvnw spring-boot:run            # Flyway applies migrations on startup
@@ -169,6 +171,8 @@ one origin.
 
 API docs (Swagger UI): http://localhost:8080/swagger-ui.html
 
+Mails sent locally (password reset) are caught by Mailpit: open http://localhost:8025.
+
 ### Environment variables
 
 | Variable | Used by | Description |
@@ -185,6 +189,12 @@ API docs (Swagger UI): http://localhost:8080/swagger-ui.html
 | `SPRING_PROFILES_ACTIVE` | backend | `demo` recreates the demo teacher and their data on every start |
 | `DEMO_EMAIL`, `DEMO_PASSWORD` | backend (demo profile) | Demo teacher account; the password must have at least 8 characters |
 | `KEEP_ALIVE_URL` | backend | Public backend URL for the keep-alive pinger; defaults to `RENDER_EXTERNAL_URL` (set by Render), empty locally |
+| `MAIL_HOST`, `MAIL_PORT` | backend | SMTP server for mails (default `localhost:1025`, the Mailpit container) |
+| `MAIL_FROM` | backend | Sender address of mails; with Brevo it must be a verified sender |
+| `BREVO_API_KEY` | backend | Optional. When set, mails go through Brevo's HTTPS API instead of SMTP (production) |
+| `APP_FRONTEND_URL` | backend | Base URL of the link in the reset mail (default `http://localhost:5173`) |
+| `METRICS_PASSWORD` | backend | Password of the `prometheus` user for `/actuator/prometheus`; empty keeps the endpoint closed |
+| `RATE_LIMIT_ENABLED` | backend | `true` by default; `false` turns the rate limits off (e.g. load tests) |
 | `VITE_API_URL` | frontend build | Backend origin; leave empty when `/api` is proxied (dev server, Vercel) |
 | `VITE_WS_URL` | frontend build | Live quiz WebSocket, e.g. `wss://<backend>/ws`; leave empty in dev (Vite proxies `/ws`) |
 | `VITE_DEMO_EMAIL`, `VITE_DEMO_PASSWORD` | frontend build | Optional. Shows a "Use demo account" button on the login page. These values end up in the public JS bundle, so use them only for the demo account; locally put them in `frontend/.env.local` |
@@ -204,7 +214,11 @@ The repository contains the configuration for a free deployment:
   builds [`backend/Dockerfile`](backend/Dockerfile): a multi-stage build (JDK 26 + Maven →
   JRE 26), running as a non-root user with the heap sized for a 512 MB container. Render
   asks for the secret values (`DB_URL`, `DB_USERNAME`, `DB_PASSWORD`, `CORS_ALLOWED_ORIGINS`,
-  `DEMO_PASSWORD`) and generates `JWT_SECRET`. The health check is
+  `DEMO_PASSWORD`, `BREVO_API_KEY`, `MAIL_FROM`, `METRICS_PASSWORD`) and generates
+  `JWT_SECRET`. The `prod` profile switches the logs to JSON.
+  Render's free plan blocks outgoing SMTP (ports 25, 465, 587), so password reset mails are
+  sent through the HTTPS API of [Brevo](https://www.brevo.com) (free plan, verified sender).
+  Without `BREVO_API_KEY` the app still runs; reset mails simply fail and are logged. The health check is
   `/actuator/health/liveness`, which does not depend on the database.
 - **Frontend – Vercel** with root directory `frontend`.
   [`frontend/vercel.json`](frontend/vercel.json) rewrites `/api/*` to the Render URL and every
@@ -251,6 +265,8 @@ that differ only in case.
 | `POST /api/auth/login` | Sign in (401 with the same message for unknown email and wrong password) |
 | `POST /api/auth/refresh` | Rotate the refresh token, return a new access token |
 | `POST /api/auth/logout` | Revoke the refresh token and clear the cookie (204) |
+| `POST /api/auth/forgot-password` | Mail a reset link; always 204, see [Password reset](#password-reset) |
+| `POST /api/auth/reset-password` | Set a new password with the token from the link (204; 400 when invalid or expired) |
 | `GET /api/me` | Current user (needs `Authorization: Bearer <access token>`) |
 | `GET`/`PUT /api/admin/keep-alive` | Keep-alive switch, `ADMIN` only (403 for teachers), see [Deploy](#keep-alive-switch-admin) |
 
@@ -448,6 +464,84 @@ Design notes:
   option labels; the correct options, accepted answers and per-option counts appear in the
   reveal phase.
 
+## Security & operations
+
+### Rate limits
+
+An in-memory token bucket per key
+([`TokenBucket`](backend/src/main/java/com/smartteach/common/ratelimit/TokenBucket.java), no
+extra library). Each rule allows `capacity` requests per `period` and refills smoothly; the
+values are in `app.rate-limit.rules` in `application.yml`.
+
+| Endpoint | Key | Default |
+|---|---|---|
+| `login`, `register`, `forgot-password`, `reset-password` | IP | 30 / minute (`auth-ip`, shared) |
+| `login` | IP + email | 5 / minute |
+| `register` | IP | 5 / hour |
+| `refresh` | IP | 60 / minute |
+| `forgot-password` | email | 3 / 15 minutes |
+| `reset-password` | IP | 10 / 15 minutes |
+| `POST /api/public/assignments/{code}/start` | IP | 120 / minute (a class shares one school IP) |
+| `POST /api/public/live/{pin}/players` | IP | 120 / minute |
+
+Over the limit the API answers `429 Too Many Requests` with a `Retry-After` header (seconds)
+and a `ProblemDetail`; the frontend shows "try again in N seconds". Behind Render's proxy the
+client IP comes from `X-Forwarded-For` (`server.forward-headers-strategy: native`). Buckets live
+in one JVM's memory, which fits a single instance; several instances would need a shared
+store such as Redis.
+
+### Password reset
+
+1. `POST /api/auth/forgot-password` always answers `204`, whether or not the email has an
+   account, and the mail is sent in the background (`@Async`), so the response time does not
+   reveal it either.
+2. The token is 32 random bytes; only its SHA-256 hash is stored in `password_reset_tokens`
+   (Flyway `V5`). It is valid for 30 minutes and works once: using it is a conditional
+   `UPDATE … WHERE used_at IS NULL`, so two parallel requests cannot both succeed.
+3. The link is `/reset-password#token=…`. A URL fragment is never sent to a server, so the
+   token stays out of access logs, and the page removes it from the address bar.
+4. After the new password is set, the user's other reset links stop working and **every
+   refresh token is revoked**: all sessions are signed out.
+
+Mail goes through an `EmailSender` interface: SMTP locally (Mailpit in `docker-compose.yml`,
+inbox at http://localhost:8025) and Brevo's HTTPS API in production, picked by whether
+`BREVO_API_KEY` is set. Tests use an in-memory sender.
+
+### Optimistic locking
+
+`quizzes` and `assignments` have a `version` column (JPA `@Version`, Flyway `V4`). Responses
+include `version`, and `PUT` sends back the version the client loaded. If someone saved in
+the meantime (another tab or device), the save is refused with `409 Conflict` instead of
+silently overwriting their work; the editor says "Quiz đã được sửa ở nơi khác" and offers a
+**Tải lại** button that loads the latest copy. A `PUT` without `version` (scripts) just
+overwrites.
+
+### Request id and logs
+
+A filter gives every request an id: the client's `X-Request-Id` if it is a short safe string
+(`[A-Za-z0-9._-]{1,64}`), otherwise a new UUID. It is put in the logging MDC, returned in the
+`X-Request-Id` response header and added to every `ProblemDetail` as `requestId`, so an error a
+user reports can be matched with the server log. Locally logs are plain text with
+`[requestId]`; with the `prod` profile they are JSON (one object per line, Elastic Common
+Schema) for log tools.
+
+### Metrics
+
+Micrometer with the Prometheus registry at `/actuator/prometheus`. It is not public: a separate
+security chain requires HTTP Basic auth as user `prometheus` with `METRICS_PASSWORD` (empty =
+endpoint closed), and a teacher's JWT does not open it. Besides the JVM, HTTP and connection
+pool metrics, the app publishes:
+
+| Metric | Type | Meaning |
+|---|---|---|
+| `smartteach_live_rooms_open` | gauge | Live quiz rooms not yet ended |
+| `smartteach_attempts_submitted_total` | counter | Assignment attempts submitted |
+| `smartteach_ratelimit_rejected_total{rule=…}` | counter | Requests refused with 429, per rule |
+
+```bash
+curl -u prometheus:$METRICS_PASSWORD http://localhost:8080/actuator/prometheus | grep smartteach_
+```
+
 ## Tests
 
 ```bash
@@ -472,6 +566,11 @@ Live quiz tests cover the room rules as unit tests (scoring, nickname rules, lim
 stale timers, late and duplicate answers, ties, expiry) and, with the server on a random port,
 a full game over HTTP, "another teacher gets 404", and a real STOMP client that receives the
 pushed states and is refused when it tries to send or subscribe to another topic.
+Security & operations tests cover 429 with `Retry-After` per IP and per email, the full
+password reset (old password and old sessions stop working, single use, expiry, hash-only
+storage, unknown emails send nothing), `409` on a stale quiz or assignment save, the
+`X-Request-Id` header and `requestId` in errors, and `/actuator/prometheus` (401 without the
+password or with a teacher token, custom metrics with it).
 
 The JaCoCo report is written to `backend/target/site/jacoco/index.html`. `mvn verify` fails if
 line coverage of any `service` package drops below 70%.
