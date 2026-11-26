@@ -5,6 +5,8 @@ import { Link, useLocation, useNavigate } from 'react-router'
 import { z } from 'zod'
 import { useAuth } from '../auth/auth-context'
 import { AuthCard, Field, FormError, SubmitButton } from '../components/form'
+import { ColdStartHint } from '../components/states'
+import { button, link } from '../components/ui'
 import { problemOf } from '../lib/api'
 
 const schema = z.object({
@@ -13,6 +15,12 @@ const schema = z.object({
 })
 
 type FormValues = z.infer<typeof schema>
+
+// Set on the public demo site only, so visitors can look around without registering.
+const demoAccount =
+  import.meta.env.VITE_DEMO_EMAIL && import.meta.env.VITE_DEMO_PASSWORD
+    ? { email: import.meta.env.VITE_DEMO_EMAIL, password: import.meta.env.VITE_DEMO_PASSWORD }
+    : null
 
 export function LoginPage() {
   const { login } = useAuth()
@@ -32,7 +40,22 @@ export function LoginPage() {
     : undefined
 
   return (
-    <AuthCard title="Đăng nhập">
+    <AuthCard
+      title="Đăng nhập"
+      description="Dành cho giáo viên"
+      footer={
+        <>
+          Học sinh?{' '}
+          <Link to="/s" className={link}>
+            Vào làm bài tập
+          </Link>{' '}
+          hoặc{' '}
+          <Link to="/play" className={link}>
+            chơi quiz trực tiếp
+          </Link>
+        </>
+      }
+    >
       <form className="space-y-4" noValidate onSubmit={handleSubmit((values) => mutation.mutate(values))}>
         <FormError message={errorMessage} />
         <Field
@@ -52,10 +75,28 @@ export function LoginPage() {
           {...register('password')}
         />
         <SubmitButton pending={mutation.isPending}>Đăng nhập</SubmitButton>
+        {mutation.isPending && <ColdStartHint />}
       </form>
-      <p className="mt-6 text-center text-sm text-slate-600">
+
+      {demoAccount && (
+        <div className="mt-4 space-y-4">
+          <p className="flex items-center gap-3 text-sm text-ink-muted before:h-px before:flex-1 before:bg-border after:h-px after:flex-1 after:bg-border">
+            hoặc
+          </p>
+          <button
+            type="button"
+            className={`${button('secondary')} w-full`}
+            disabled={mutation.isPending}
+            onClick={() => mutation.mutate(demoAccount)}
+          >
+            Dùng tài khoản demo
+          </button>
+        </div>
+      )}
+
+      <p className="mt-6 text-center text-sm text-ink-muted">
         Chưa có tài khoản?{' '}
-        <Link to="/register" className="font-medium text-blue-600 hover:underline">
+        <Link to="/register" className={link}>
           Đăng ký
         </Link>
       </p>
