@@ -2,14 +2,21 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Navigate } from 'react-router'
 import { useAuth } from '../auth/auth-context'
 import { FormError } from '../components/form'
-import { card } from '../components/ui'
+import { PageHeader } from '../components/page'
+import { QueryState, Skeleton } from '../components/states'
+import { badge, card, muted } from '../components/ui'
 import { adminApi, adminKeys } from './api'
 
 export function AdminPage() {
   const { user } = useAuth()
   // The backend checks the role too; this only keeps teachers off a page full of 403s.
   if (user?.role !== 'ADMIN') return <Navigate to="/" replace />
-  return <KeepAliveCard />
+  return (
+    <div className="space-y-6">
+      <PageHeader title="Quản trị" description="Cài đặt chung của server." />
+      <KeepAliveCard />
+    </div>
+  )
 }
 
 function KeepAliveCard() {
@@ -20,22 +27,24 @@ function KeepAliveCard() {
     onSuccess: (data) => queryClient.setQueryData(adminKeys.keepAlive, data),
   })
 
-  const data = status.data
-  const enabled = data?.enabled ?? false
-
   return (
-    <div className="space-y-6">
-      <h1 className="text-2xl font-bold text-slate-900">Quản trị</h1>
-
-      {status.isPending && <p className="text-slate-500">Đang tải…</p>}
-      {status.isError && <FormError message="Không tải được trạng thái." />}
-
-      {data && (
+    <QueryState
+      query={status}
+      error="Không tải được trạng thái."
+      loading={
+        <div role="status" aria-label="Đang tải" className={`${card} max-w-xl space-y-3`}>
+          <Skeleton className="h-5 w-1/2" />
+          <Skeleton className="h-4 w-full" />
+          <Skeleton className="h-4 w-4/5" />
+        </div>
+      }
+    >
+      {(data) => (
         <section className={`${card} max-w-xl space-y-4`}>
           <div className="flex items-start justify-between gap-4">
             <div>
-              <h2 className="font-semibold text-slate-900">Giữ server luôn thức</h2>
-              <p className="mt-1 text-sm text-slate-500">
+              <h2 className="text-heading text-ink">Giữ server luôn thức</h2>
+              <p className={`mt-1 ${muted}`}>
                 Gói miễn phí tắt server sau 15 phút không có truy cập, lần mở sau phải chờ 2–3 phút. Khi bật,
                 server tự gọi chính nó mỗi {data.intervalMinutes} phút để không bị tắt.
               </p>
@@ -43,17 +52,17 @@ function KeepAliveCard() {
             <button
               type="button"
               role="switch"
-              aria-checked={enabled}
+              aria-checked={data.enabled}
               aria-label="Giữ server luôn thức"
               disabled={toggle.isPending}
-              onClick={() => toggle.mutate(!enabled)}
+              onClick={() => toggle.mutate(!data.enabled)}
               className={`relative inline-flex h-7 w-12 shrink-0 items-center rounded-full transition disabled:opacity-60 ${
-                enabled ? 'bg-blue-600' : 'bg-slate-300'
+                data.enabled ? 'bg-primary' : 'bg-border-strong'
               }`}
             >
               <span
-                className={`inline-block h-5 w-5 rounded-full bg-white shadow transition ${
-                  enabled ? 'translate-x-6' : 'translate-x-1'
+                className={`inline-block size-5 rounded-full bg-white shadow-rest transition ${
+                  data.enabled ? 'translate-x-6' : 'translate-x-1'
                 }`}
               />
             </button>
@@ -61,19 +70,21 @@ function KeepAliveCard() {
 
           {toggle.isError && <FormError message="Không đổi được trạng thái. Thử lại." />}
 
-          <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 text-sm">
-            <dt className="text-slate-500">Trạng thái</dt>
-            <dd className="font-medium text-slate-900">{enabled ? 'Đang bật' : 'Đang tắt'}</dd>
-            <dt className="text-slate-500">Địa chỉ ping</dt>
-            <dd className="break-all text-slate-900">
+          <dl className="grid gap-x-4 gap-y-1 border-t border-border pt-4 text-sm sm:grid-cols-[auto_1fr] sm:gap-y-2">
+            <dt className="text-ink-muted">Trạng thái</dt>
+            <dd className="mb-2 sm:mb-0">
+              <span className={badge(data.enabled ? 'success' : 'neutral')}>{data.enabled ? 'Đang bật' : 'Đang tắt'}</span>
+            </dd>
+            <dt className="text-ink-muted">Địa chỉ ping</dt>
+            <dd className="mb-2 break-all text-ink sm:mb-0">
               {data.targetUrl ?? 'Chưa cấu hình (chạy local), bật cũng không ping'}
             </dd>
-            <dt className="text-slate-500">Lần ping gần nhất</dt>
-            <dd className="text-slate-900">
+            <dt className="text-ink-muted">Lần ping gần nhất</dt>
+            <dd className="text-ink">
               {data.lastPingAt ? (
                 <>
                   {new Date(data.lastPingAt).toLocaleString('vi-VN')} ·{' '}
-                  <span className={data.lastPingOk ? 'text-green-700' : 'text-red-700'}>
+                  <span className={`font-semibold ${data.lastPingOk ? 'text-success' : 'text-danger'}`}>
                     {data.lastPingOk ? 'thành công' : 'thất bại'}
                   </span>
                 </>
@@ -84,6 +95,6 @@ function KeepAliveCard() {
           </dl>
         </section>
       )}
-    </div>
+    </QueryState>
   )
 }
