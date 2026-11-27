@@ -93,6 +93,9 @@ Lighthouse (production build, simulated mobile throttling, median of 3 runs):
   flags questions that are too hard or do not separate students.
 - **Live quiz:** the teacher projects a game, students join from their phones with a PIN and a
   nickname, points depend on correctness and speed; state is pushed over WebSocket (STOMP).
+- **Deadlines and email:** attempts left in progress are submitted and graded when the
+  assignment ends; the teacher gets a reminder 24 hours before the deadline and a summary when
+  it ends, sent through a transactional outbox with retries (can be turned off per account).
 - **Data retention:** a nightly job deletes student attempts older than 90 days.
 - **Security & operations:** rate limits, password reset by email, optimistic locking,
   request ids with JSON logs and Prometheus metrics, see
@@ -272,6 +275,7 @@ that differ only in case.
 | `POST /api/auth/forgot-password` | Mail a reset link; always 204, see [Password reset](#password-reset) |
 | `POST /api/auth/reset-password` | Set a new password with the token from the link (204; 400 when invalid or expired) |
 | `GET /api/me` | Current user (needs `Authorization: Bearer <access token>`) |
+| `PUT /api/me/settings` | `{"emailNotifications": false}` turns off assignment mails, see [Background email](#background-email-and-scheduled-jobs) |
 | `GET`/`PUT /api/admin/keep-alive` | Keep-alive switch, `ADMIN` only (403 for teachers), see [Deploy](#keep-alive-switch-admin) |
 
 How it works:
@@ -372,7 +376,7 @@ status goes `draft` → `published` → `closed`.
 | `POST /api/assignments` | Create a draft: class, quiz, title, description, `opensAt`, `dueAt`, `revealPolicy` |
 | `GET` / `PUT` / `DELETE /api/assignments/{id}` | Read, edit, delete (attempts go with it) |
 | `POST /api/assignments/{id}/publish` | Freeze the quiz into a snapshot and open the assignment |
-| `POST /api/assignments/{id}/close` | Close early; students can no longer save or submit |
+| `POST /api/assignments/{id}/close` | Close early; attempts in progress are submitted and graded, students can no longer save |
 | `GET /api/assignments/{id}/analytics` | Average score, correct rate per question, every student's status |
 | `GET /api/assignments/{id}/question-stats` | Item analysis per question, see [Item analysis](#item-analysis) |
 
@@ -410,6 +414,11 @@ Design notes:
   correct / total × 100, rounded to a whole number. Submitting twice returns the first result.
 - **Time rules.** `dueAt` must be after `opensAt`. Saving or submitting before `opensAt`, after
   `dueAt` or after closing returns **409**.
+- **End of an assignment.** When the deadline passes or the teacher closes it, attempts still
+  in progress are submitted and graded on the answers saved so far, with `submitted_at` = the
+  end time. A close does it in the same request; for a deadline `AssignmentDeadlineJob` does it
+  within the hour. The teacher then gets one summary mail, see
+  [Background email](#background-email-and-scheduled-jobs).
 - **Retention.** `AttemptRetentionJob` runs every night at 03:00 UTC and deletes attempts (and
   their answers) started more than 90 days ago. The cron can be changed with `app.retention.cron`.
 
@@ -530,8 +539,8 @@ store such as Redis.
 ### Password reset
 
 1. `POST /api/auth/forgot-password` always answers `204`, whether or not the email has an
-   account, and the mail is sent in the background (`@Async`), so the response time does not
-   reveal it either.
+   account, and the mail is only queued in the outbox and sent in the background, so the
+   response time does not reveal it either.
 2. The token is 32 random bytes; only its SHA-256 hash is stored in `password_reset_tokens`
    (Flyway `V5`). It is valid for 30 minutes and works once: using it is a conditional
    `UPDATE … WHERE used_at IS NULL`, so two parallel requests cannot both succeed.
@@ -542,7 +551,57 @@ store such as Redis.
 
 Mail goes through an `EmailSender` interface: SMTP locally (Mailpit in `docker-compose.yml`,
 inbox at http://localhost:8025) and Brevo's HTTPS API in production, picked by whether
-`BREVO_API_KEY` is set. Tests use an in-memory sender.
+`BREVO_API_KEY` is set. Tests use an in-memory sender. Application code never calls it
+directly: mails go through the outbox below.
+
+### Background email and scheduled jobs
+
+Teachers get two mails about an assignment (students have no email address):
+
+- **Reminder**, 24 hours before `dueAt`, only if some students have not submitted: how many have
+  not started, how many are in progress, and the assignment code to send them. Assignments open
+  for less than 24 hours get none.
+- **Summary**, once, when the assignment ends: submitted / not submitted, how many were
+  auto-submitted, the average score, and the question with the lowest correct rate with its most
+  common wrong answer.
+
+Times are stored in UTC (`TIMESTAMPTZ`, `Instant`) and shown in the mails in Vietnam time
+(`Asia/Ho_Chi_Minh`). The mails end with a link to the **Tài khoản** page, where the teacher can
+turn them off (`users.email_notifications`, Flyway `V6`); password reset mails are always sent.
+Moving the deadline of a published assignment allows a new reminder and summary.
+
+**Outbox pattern.** A mail is never sent inside a request. `MailQueue` inserts a row into
+`email_outbox` in the same transaction as the change that caused it, so a summary exists
+exactly when the close is committed, and a slow or failing mail provider cannot break or slow a
+request. `OutboxSender` sends due rows and marks them `SENT`; a failure is retried after 1, 2, 4
+and 8 minutes, and after 5 tries the row is `FAILED` with `last_error` kept. Each row is saved
+right after its own send, so a crash re-sends at most one mail (at-least-once). The text of a
+mail is cleared once it is sent or given up (a reset mail holds a live link), and finished rows
+are deleted after 30 days.
+
+**Claiming work once.** The summary and the reminder are claimed with a conditional update
+(`UPDATE assignments SET summary_queued_at = now() WHERE id = ? AND summary_queued_at IS NULL`)
+under a row lock, so the job and a teacher's close cannot both send one. These two columns are
+not mapped on the JPA entity, so the job never bumps the `version` a teacher's editor holds.
+
+**ShedLock.** Jobs that change the database take a lock in the `shedlock` table
+(`JdbcTemplateLockProvider` using the database clock), so with two backend instances each run
+happens on one of them only:
+
+| Job | Schedule | Lock |
+|---|---|---|
+| `AssignmentDeadlineJob` (auto-submit, summary, reminder) | 2 minutes after startup, then every hour | `assignment-deadlines` |
+| `OutboxSender` | every 10 s, only when there can be something to send | `email-outbox` |
+| `OutboxJob.deleteOld` | 03:30 UTC | `email-outbox-cleanup` |
+| `AttemptRetentionJob` | 03:00 UTC | `attempt-retention` |
+| Live room cleanup, rate-limit eviction | every 1 and 5 minutes | none: they clean the memory of their own instance |
+| Keep-alive ping | every 10 minutes | none: a double ping is harmless, and a lock write would keep the database awake |
+
+Two choices come from the free plans. Render puts the server to sleep, so a cron time can be
+missed: the deadline job runs on a fixed delay and its queries look at state ("ended and not
+finished yet"), so a late run catches up. Neon suspends the database when no query arrives for
+5 minutes, so the outbox is not polled: it is read after a mail is queued (woken after commit),
+once after startup, and while rows are still waiting for a retry.
 
 ### Optimistic locking
 
@@ -573,6 +632,7 @@ pool metrics, the app publishes:
 |---|---|---|
 | `smartteach_live_rooms_open` | gauge | Live quiz rooms not yet ended |
 | `smartteach_attempts_submitted_total` | counter | Assignment attempts submitted |
+| `smartteach_attempts_auto_submitted_total` | counter | Attempts submitted by the deadline job or a close |
 | `smartteach_ratelimit_rejected_total{rule=…}` | counter | Requests refused with 429, per rule |
 
 ```bash
@@ -611,6 +671,12 @@ password reset (old password and old sessions stop working, single use, expiry, 
 storage, unknown emails send nothing), `409` on a stale quiz or assignment save, the
 `X-Request-Id` header and `requestId` in errors, and `/actuator/prometheus` (401 without the
 password or with a teacher token, custom metrics with it).
+Background job tests move time by editing rows: after the deadline, attempts in progress are
+graded at the deadline and exactly one summary goes out however often the job runs; a close
+does it in the same request; the reminder comes once, not for short assignments or when
+everyone submitted, again after the deadline moves, and never when the teacher turned mails
+off. Outbox tests check one send per mail, a failed send retried after its backoff, giving up
+after 5 tries, no mail after a rollback, and that the jobs ran under a ShedLock lock.
 
 The JaCoCo report is written to `backend/target/site/jacoco/index.html`. `mvn verify` fails if
 line coverage of any `service` package drops below 70%.
