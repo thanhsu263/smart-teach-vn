@@ -6,6 +6,7 @@ import com.smartteach.assignment.dto.AssignmentResponse;
 import com.smartteach.assignment.dto.AssignmentSummaryResponse;
 import com.smartteach.assignment.dto.QuestionStatsResponse;
 import com.smartteach.assignment.service.AnalyticsService;
+import com.smartteach.assignment.service.AssignmentDeadlineService;
 import com.smartteach.assignment.service.AssignmentService;
 import com.smartteach.assignment.service.QuestionStatsService;
 import com.smartteach.common.dto.PageResponse;
@@ -40,6 +41,7 @@ import org.springframework.web.bind.annotation.RestController;
 public class AssignmentController {
 
     private final AssignmentService assignmentService;
+    private final AssignmentDeadlineService deadlineService;
     private final AnalyticsService analyticsService;
     private final QuestionStatsService questionStatsService;
 
@@ -85,9 +87,11 @@ public class AssignmentController {
     }
 
     @PostMapping("/{id}/close")
-    @Operation(summary = "Close a published assignment: students can no longer answer")
+    @Operation(summary = "Close a published assignment: students can no longer answer",
+            description = "Attempts still in progress are submitted with the answers saved so far, and the "
+                    + "teacher gets a summary email (unless email notifications are off).")
     public AssignmentResponse close(@AuthenticationPrincipal Jwt jwt, @PathVariable Long id) {
-        return assignmentService.close(CurrentUser.id(jwt), id);
+        return deadlineService.close(CurrentUser.id(jwt), id);
     }
 
     @GetMapping("/{id}/analytics")

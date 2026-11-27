@@ -146,6 +146,25 @@ public class AttemptService {
         return toResult(attempt, assignment, now);
     }
 
+    /**
+     * Deadline passed or assignment closed: grades every attempt still in progress with the
+     * answers saved so far, as if the student had pressed submit at {@code endedAt}.
+     */
+    public int submitInProgress(Assignment assignment, Instant endedAt) {
+        List<Attempt> open = attemptRepository.findByAssignmentIdAndStatus(assignment.getId(), AttemptStatus.IN_PROGRESS);
+        if (open.isEmpty()) {
+            return 0;
+        }
+        List<QuestionResponse> questions = snapshots.read(assignment.getQuizSnapshot()).questions();
+        for (Attempt attempt : open) {
+            grade(attempt, questions, endedAt);
+        }
+        // The summary mail is built from SQL counts right after this; they must see the grades.
+        attemptRepository.flush();
+        meterRegistry.counter("smartteach.attempts.auto_submitted").increment(open.size());
+        return open.size();
+    }
+
     @Transactional(readOnly = true)
     public AttemptResultResponse result(Long attemptId, String token) {
         Attempt attempt = findByToken(attemptId, token);

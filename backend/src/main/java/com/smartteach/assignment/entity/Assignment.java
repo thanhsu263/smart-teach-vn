@@ -94,6 +94,14 @@ public class Assignment {
                 && (dueAt == null || dueAt.isAfter(now));
     }
 
+    /** When answering stopped: the deadline or the teacher's close, whichever came first. */
+    public Instant endedAt() {
+        if (closedAt != null && (dueAt == null || closedAt.isBefore(dueAt))) {
+            return closedAt;
+        }
+        return dueAt;
+    }
+
     /** Closed by the teacher or past the deadline: nobody can answer any more. */
     public boolean isEnded(Instant now) {
         return status == AssignmentStatus.CLOSED || (dueAt != null && !dueAt.isAfter(now));

@@ -8,6 +8,7 @@ import java.util.Optional;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
+import org.springframework.transaction.annotation.Transactional;
 
 public interface AttemptRepository extends JpaRepository<Attempt, Long> {
 
@@ -19,10 +20,13 @@ public interface AttemptRepository extends JpaRepository<Attempt, Long> {
 
     List<Attempt> findByAssignmentIdAndStatusNot(Long assignmentId, AttemptStatus status);
 
+    List<Attempt> findByAssignmentIdAndStatus(Long assignmentId, AttemptStatus status);
+
     long countByAssignmentIdAndStatus(Long assignmentId, AttemptStatus status);
 
     /** Answers go with them (ON DELETE CASCADE). */
     @Modifying
+    @Transactional
     @Query(value = "DELETE FROM attempts WHERE started_at < :cutoff", nativeQuery = true)
     int deleteStartedBefore(Instant cutoff);
 }

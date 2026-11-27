@@ -95,8 +95,13 @@ public class AssignmentService {
             throw ApiException.conflict("The class and quiz cannot change after publishing");
         }
         checkSchedule(request, assignment.getDueAt());
+        Instant oldDueAt = assignment.getDueAt();
         apply(ownerId, assignment, request);
         assignment.setUpdatedAt(clock.instant());
+        if (assignment.getStatus() == AssignmentStatus.PUBLISHED && !Objects.equals(oldDueAt, assignment.getDueAt())) {
+            // A new deadline gets its own 24h reminder and closing summary.
+            assignmentRepository.resetQueuedMails(assignmentId);
+        }
         return flushAndMap(assignment);
     }
 
@@ -130,7 +135,7 @@ public class AssignmentService {
         return flushAndMap(assignment);
     }
 
-    /** Stops all answering. Attempts still in progress stay unsubmitted. */
+    /** Stops all answering. {@link AssignmentDeadlineService#close} then submits the attempts left. */
     @Transactional
     public AssignmentResponse close(Long ownerId, Long assignmentId) {
         Assignment assignment = findOwnedForUpdate(ownerId, assignmentId);
