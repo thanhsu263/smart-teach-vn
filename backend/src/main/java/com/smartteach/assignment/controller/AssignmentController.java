@@ -4,8 +4,10 @@ import com.smartteach.assignment.dto.AnalyticsResponse;
 import com.smartteach.assignment.dto.AssignmentRequest;
 import com.smartteach.assignment.dto.AssignmentResponse;
 import com.smartteach.assignment.dto.AssignmentSummaryResponse;
+import com.smartteach.assignment.dto.QuestionStatsResponse;
 import com.smartteach.assignment.service.AnalyticsService;
 import com.smartteach.assignment.service.AssignmentService;
+import com.smartteach.assignment.service.QuestionStatsService;
 import com.smartteach.common.dto.PageResponse;
 import com.smartteach.common.security.CurrentUser;
 import io.swagger.v3.oas.annotations.Operation;
@@ -39,6 +41,7 @@ public class AssignmentController {
 
     private final AssignmentService assignmentService;
     private final AnalyticsService analyticsService;
+    private final QuestionStatsService questionStatsService;
 
     @GetMapping
     @Operation(summary = "List my assignments, newest first, optionally only one class")
@@ -91,5 +94,14 @@ public class AssignmentController {
     @Operation(summary = "Average score, correct rate per question and progress of every student")
     public AnalyticsResponse analytics(@AuthenticationPrincipal Jwt jwt, @PathVariable Long id) {
         return analyticsService.analytics(CurrentUser.id(jwt), id);
+    }
+
+    @GetMapping("/{id}/question-stats")
+    @Operation(summary = "Item analysis per question: correct rate, discrimination, most chosen wrong answer",
+            description = "From submitted attempts. Discrimination = (correct in the best 27% - correct in the "
+                    + "worst 27%) / group size; null while fewer than 10 attempts are submitted. "
+                    + "tooHard: correct rate below 30%; lowDiscrimination: discrimination below 0.2.")
+    public QuestionStatsResponse questionStats(@AuthenticationPrincipal Jwt jwt, @PathVariable Long id) {
+        return questionStatsService.questionStats(CurrentUser.id(jwt), id);
     }
 }
