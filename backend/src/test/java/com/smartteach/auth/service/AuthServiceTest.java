@@ -46,7 +46,7 @@ class AuthServiceTest {
         when(refreshTokenService.issue(any())).thenReturn(new RefreshTokenService.IssuedToken("refresh", NOW));
         when(userMapper.toResponse(any())).thenAnswer(inv -> {
             User u = inv.getArgument(0);
-            return new UserResponse(u.getId(), u.getEmail(), u.getFullName(), u.getRole());
+            return new UserResponse(u.getId(), u.getEmail(), u.getFullName(), u.getRole(), u.isEmailNotifications());
         });
         service = new AuthService(userRepository, passwordEncoder, tokenService, refreshTokenService, userMapper,
                 Clock.fixed(NOW, ZoneOffset.UTC));

@@ -144,9 +144,12 @@ class PasswordResetIntegrationTest extends IntegrationTest {
                 {"email":"%s","password":"%s"}""".formatted(email, password));
     }
 
+    /** Asks for a reset link and lets the outbox deliver it, as the background job would. */
     private ResultActions forgot(String email) throws Exception {
-        return json(post("/api/auth/forgot-password"), """
+        ResultActions result = json(post("/api/auth/forgot-password"), """
                 {"email":"%s"}""".formatted(email));
+        sendQueuedMails();
+        return result;
     }
 
     private ResultActions reset(String token, String password) throws Exception {

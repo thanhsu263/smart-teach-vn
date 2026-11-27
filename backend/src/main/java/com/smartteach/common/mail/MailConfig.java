@@ -5,13 +5,10 @@ import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.mail.javamail.JavaMailSender;
-import org.springframework.scheduling.annotation.EnableAsync;
 
 /** Picks the mail transport: Brevo when BREVO_API_KEY is set, otherwise SMTP. */
 @Slf4j
 @Configuration
-// Mails are sent on Spring Boot's task executor; a failure is logged, never shown to the user.
-@EnableAsync
 public class MailConfig {
 
     @Bean

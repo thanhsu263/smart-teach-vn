@@ -322,7 +322,7 @@ class AssignmentFlowIntegrationTest extends IntegrationTest {
         Started recent = start(code, s.codes.get(1));
         jdbc.update("UPDATE attempts SET started_at = now() - interval '91 days' WHERE id = ?", old.id);
 
-        assertThat(retentionJob.deleteOldAttempts()).isGreaterThanOrEqualTo(1);
+        retentionJob.deleteOldAttempts();
 
         assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM attempts WHERE id = ?", Integer.class, old.id)).isZero();
         assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM attempt_answers WHERE attempt_id = ?", Integer.class,

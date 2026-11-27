@@ -21,6 +21,7 @@ const pages = {
     import('./assignments/AssignmentEditorPage').then((m) => ({ Component: m.AssignmentEditorPage })),
   assignmentDetail: () =>
     import('./assignments/AssignmentDetailPage').then((m) => ({ Component: m.AssignmentDetailPage })),
+  account: () => import('./pages/AccountPage').then((m) => ({ Component: m.AccountPage })),
   admin: () => import('./admin/AdminPage').then((m) => ({ Component: m.AdminPage })),
   host: () => import('./live/HostPage').then((m) => ({ Component: m.HostPage })),
   play: () => import('./live/PlayPage').then((m) => ({ Component: m.PlayPage })),
@@ -54,6 +55,7 @@ const router = createBrowserRouter([
               { path: '/assignments/new', lazy: pages.assignmentEditor },
               { path: '/assignments/:id', lazy: pages.assignmentDetail },
               { path: '/assignments/:id/edit', lazy: pages.assignmentEditor },
+              { path: '/account', lazy: pages.account },
               { path: '/admin', lazy: pages.admin },
             ],
           },

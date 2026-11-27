@@ -41,6 +41,10 @@ public class User {
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
 
+    /** Assignment reminders and summaries by email. Password reset mails are sent either way. */
+    @Column(name = "email_notifications", nullable = false)
+    private boolean emailNotifications = true;
+
     public User(String email, String passwordHash, String fullName, Role role, Instant createdAt) {
         this.email = email;
         this.passwordHash = passwordHash;

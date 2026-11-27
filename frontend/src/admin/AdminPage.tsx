@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Navigate } from 'react-router'
 import { useAuth } from '../auth/auth-context'
-import { FormError } from '../components/form'
+import { FormError, Switch } from '../components/form'
 import { PageHeader } from '../components/page'
 import { QueryState, Skeleton } from '../components/states'
 import { badge, card, muted } from '../components/ui'
@@ -49,23 +49,12 @@ function KeepAliveCard() {
                 server tự gọi chính nó mỗi {data.intervalMinutes} phút để không bị tắt.
               </p>
             </div>
-            <button
-              type="button"
-              role="switch"
-              aria-checked={data.enabled}
-              aria-label="Giữ server luôn thức"
+            <Switch
+              checked={data.enabled}
+              label="Giữ server luôn thức"
               disabled={toggle.isPending}
-              onClick={() => toggle.mutate(!data.enabled)}
-              className={`relative inline-flex h-7 w-12 shrink-0 items-center rounded-full transition disabled:opacity-60 ${
-                data.enabled ? 'bg-primary' : 'bg-border-strong'
-              }`}
-            >
-              <span
-                className={`inline-block size-5 rounded-full bg-white shadow-rest transition ${
-                  data.enabled ? 'translate-x-6' : 'translate-x-1'
-                }`}
-              />
-            </button>
+              onChange={(enabled) => toggle.mutate(enabled)}
+            />
           </div>
 
           {toggle.isError && <FormError message="Không đổi được trạng thái. Thử lại." />}

@@ -5,6 +5,8 @@ export interface User {
   email: string
   fullName: string
   role: Role
+  /** Assignment reminder and summary mails; password reset mails are always sent. */
+  emailNotifications: boolean
 }
 
 export interface AuthResponse {

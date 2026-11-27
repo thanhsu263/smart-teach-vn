@@ -90,6 +90,39 @@ export function FormError({ message }: { message?: string }) {
   )
 }
 
+/** On/off control. The label is for screen readers; the visible text sits next to it on the page. */
+export function Switch({
+  checked,
+  label,
+  disabled,
+  onChange,
+}: {
+  checked: boolean
+  label: string
+  disabled?: boolean
+  onChange: (checked: boolean) => void
+}) {
+  return (
+    <button
+      type="button"
+      role="switch"
+      aria-checked={checked}
+      aria-label={label}
+      disabled={disabled}
+      onClick={() => onChange(!checked)}
+      className={`relative inline-flex h-7 w-12 shrink-0 items-center rounded-full transition disabled:opacity-60 ${
+        checked ? 'bg-primary' : 'bg-border-strong'
+      }`}
+    >
+      <span
+        className={`inline-block size-5 rounded-full bg-white shadow-rest transition ${
+          checked ? 'translate-x-6' : 'translate-x-1'
+        }`}
+      />
+    </button>
+  )
+}
+
 /** Shown when a save is refused with 409 because the item was saved elsewhere (another tab). */
 export function ConflictError({ message, onReload, reloading }: { message: string; onReload: () => void; reloading: boolean }) {
   return (

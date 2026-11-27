@@ -4,7 +4,7 @@ import com.smartteach.auth.entity.PasswordResetToken;
 import com.smartteach.auth.repository.PasswordResetTokenRepository;
 import com.smartteach.auth.repository.RefreshTokenRepository;
 import com.smartteach.common.exception.ApiException;
-import com.smartteach.common.mail.EmailSender;
+import com.smartteach.common.mail.MailQueue;
 import com.smartteach.common.mail.MailProperties;
 import com.smartteach.common.security.Hashing;
 import com.smartteach.user.entity.User;
@@ -22,8 +22,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * "Forgot password" by email. The request always looks the same from outside (204, mail sent in
- * the background), so it cannot be used to find out which emails have an account. The link holds
+ * "Forgot password" by email. The request always looks the same from outside (204, mail queued and
+ * sent in the background), so it cannot be used to find out which emails have an account. The link holds
  * a random token that is valid for 30 minutes and works once.
  */
 @Service
@@ -38,7 +38,7 @@ public class PasswordResetService {
     private final PasswordResetTokenRepository tokenRepository;
     private final RefreshTokenRepository refreshTokenRepository;
     private final PasswordEncoder passwordEncoder;
-    private final EmailSender emailSender;
+    private final MailQueue mailQueue;
     private final MailProperties mailProperties;
     private final Clock clock;
 
@@ -76,7 +76,7 @@ public class PasswordResetService {
 
         // In the URL fragment, which browsers never send to a server, so it stays out of access logs.
         String link = mailProperties.linkBaseUrl() + "/reset-password#token=" + raw;
-        emailSender.send(user.getEmail(), "Đặt lại mật khẩu SmartTeach", """
+        mailQueue.enqueue(user.getEmail(), "Đặt lại mật khẩu SmartTeach", """
                 Xin chào %s,
 
                 Bạn (hoặc ai đó) vừa yêu cầu đặt lại mật khẩu SmartTeach.
