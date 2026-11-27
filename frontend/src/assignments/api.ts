@@ -1,5 +1,14 @@
 import { api } from '../lib/api'
-import type { Analytics, Assignment, AssignmentPayload, AssignmentSummary, ClassItem, Page, QuizSummary } from '../lib/types'
+import type {
+  Analytics,
+  Assignment,
+  AssignmentPayload,
+  AssignmentSummary,
+  ClassItem,
+  Page,
+  QuestionStats,
+  QuizSummary,
+} from '../lib/types'
 
 export const PAGE_SIZE = 12
 /** Backend max-page-size; a teacher has fewer classes and quizzes than this. */
@@ -10,6 +19,7 @@ export const assignmentKeys = {
   list: (classId: number | null, page: number) => ['assignments', 'list', classId, page] as const,
   detail: (id: number) => ['assignments', 'detail', id] as const,
   analytics: (id: number) => ['assignments', 'analytics', id] as const,
+  questionStats: (id: number) => ['assignments', 'question-stats', id] as const,
 }
 
 export const assignmentApi = {
@@ -29,6 +39,8 @@ export const assignmentApi = {
   publish: async (id: number) => (await api.post<Assignment>(`/api/assignments/${id}/publish`)).data,
   close: async (id: number) => (await api.post<Assignment>(`/api/assignments/${id}/close`)).data,
   analytics: async (id: number) => (await api.get<Analytics>(`/api/assignments/${id}/analytics`)).data,
+  questionStats: async (id: number) =>
+    (await api.get<QuestionStats>(`/api/assignments/${id}/question-stats`)).data,
 
   // Options for the class and quiz selects.
   allClasses: async () =>

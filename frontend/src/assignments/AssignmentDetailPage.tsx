@@ -8,7 +8,7 @@ import { PageHeader } from '../components/page'
 import { EmptyState, ErrorState, QueryState, Skeleton } from '../components/states'
 import { badge, button, card, muted, panel } from '../components/ui'
 import { problemOf } from '../lib/api'
-import type { Analytics, Assignment } from '../lib/types'
+import type { Analytics, Assignment, QuestionStats } from '../lib/types'
 import { assignmentApi, assignmentKeys, studentLink } from './api'
 import { REVEAL_LABELS } from './schemas'
 import { StatusBadge } from './StatusBadge'
@@ -232,60 +232,138 @@ function AnalyticsSection({ id }: { id: number }) {
             <Stat label="Điểm trung bình" value={data.averageScore === null ? '—' : `${data.averageScore} / 100`} />
           </section>
 
-          <div className="grid gap-6 lg:grid-cols-2">
-            <section className={card}>
-              <h2 className="mb-4 text-heading text-ink">Tỉ lệ đúng từng câu</h2>
-              <ol className="space-y-4">
-                {data.questions.map((q) => (
-                  <li key={q.position} className="space-y-1.5 text-sm">
-                    <div className="flex justify-between gap-3">
-                      <span className="truncate text-ink">
-                        {q.position + 1}. {q.prompt}
-                      </span>
-                      <span className="shrink-0 font-semibold text-ink">
-                        {q.correctRate === null ? '—' : `${q.correctRate}%`}
-                      </span>
-                    </div>
-                    {/* The percentage is already in the text above, so the bar is decoration only. */}
-                    <div aria-hidden="true" className="h-2 rounded-full bg-page">
-                      <div className="h-2 rounded-full bg-primary" style={{ width: `${q.correctRate ?? 0}%` }} />
-                    </div>
-                  </li>
-                ))}
-              </ol>
-            </section>
+          {/* Item analysis comes before the student list, which can be 40+ rows long. */}
+          <QuestionStatsSection id={id} />
 
-            <section className={panel}>
-              <h2 className="px-5 pt-5 pb-3 text-heading text-ink">Học sinh</h2>
-              {data.students.length === 0 ? (
-                <p className={`${muted} px-5 pb-5`}>Lớp chưa có học sinh.</p>
-              ) : (
-                <table className="w-full text-sm">
+          <section className={panel}>
+            <h2 className="px-5 pt-5 pb-3 text-heading text-ink">Học sinh</h2>
+            {data.students.length === 0 ? (
+              <p className={`${muted} px-5 pb-5`}>Lớp chưa có học sinh.</p>
+            ) : (
+              <table className="w-full text-sm">
+                <thead className="text-left text-ink-muted">
+                  <tr>
+                    <th className="px-5 py-2 font-semibold">Họ tên</th>
+                    <th className="px-2 py-2 font-semibold">Trạng thái</th>
+                    <th className="px-5 py-2 text-right font-semibold">Điểm</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {data.students.map((s) => (
+                    <tr key={s.studentId} className="border-t border-border">
+                      <td className="px-5 py-2.5 text-ink">{s.name}</td>
+                      <td className="px-2 py-2.5">
+                        <span className={badge(progress[s.status].tone)}>{progress[s.status].label}</span>
+                      </td>
+                      <td className="px-5 py-2.5 text-right font-semibold text-ink">{s.score ?? '—'}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </section>
+        </>
+      )}
+    </QueryState>
+  )
+}
+
+type QuestionStat = QuestionStats['questions'][number]
+
+/** Hardest first; without submissions there is no rate and the quiz order is kept. */
+const byDifficulty = (a: QuestionStat, b: QuestionStat) =>
+  (a.correctRate ?? 0) - (b.correctRate ?? 0) || a.position - b.position
+
+function QuestionStatsSection({ id }: { id: number }) {
+  const stats = useQuery({ queryKey: assignmentKeys.questionStats(id), queryFn: () => assignmentApi.questionStats(id) })
+
+  return (
+    <section className={panel} aria-labelledby="question-stats-title">
+      <div className="space-y-1 px-5 pt-5 pb-3">
+        <h2 id="question-stats-title" className="text-heading text-ink">
+          Phân tích câu hỏi
+        </h2>
+        <p className={muted}>
+          Xếp từ câu khó nhất. Độ phân biệt = tỉ lệ đúng của 27% bài điểm cao nhất trừ 27% bài điểm thấp nhất (từ −1
+          đến 1); dưới 0.2 là câu chưa tách được học sinh giỏi với học sinh yếu.
+        </p>
+      </div>
+      <QueryState
+        query={stats}
+        error="Không tải được phân tích câu hỏi."
+        loading={
+          <div role="status" aria-label="Đang tải phân tích câu hỏi" className="space-y-2 px-5 pb-5">
+            <Skeleton className="h-8 w-full" />
+            <Skeleton className="h-8 w-full" />
+            <Skeleton className="h-8 w-full" />
+          </div>
+        }
+      >
+        {(data) =>
+          data.submittedCount === 0 ? (
+            <p className={`${muted} px-5 pb-5`}>Chưa có bài nộp nào.</p>
+          ) : (
+            <>
+              {data.submittedCount < data.minSubmissions && (
+                <p className="mx-5 mb-3 rounded-sm bg-page px-3 py-2 text-sm text-ink-muted">
+                  Cần ít nhất {data.minSubmissions} bài nộp để tính độ phân biệt (hiện có {data.submittedCount}).
+                </p>
+              )}
+              <div className="overflow-x-auto">
+                <table className="w-full min-w-[40rem] text-sm">
                   <thead className="text-left text-ink-muted">
                     <tr>
-                      <th className="px-5 py-2 font-semibold">Họ tên</th>
-                      <th className="px-2 py-2 font-semibold">Trạng thái</th>
-                      <th className="px-5 py-2 text-right font-semibold">Điểm</th>
+                      <th className="px-5 py-2 font-semibold">Câu</th>
+                      <th className="px-2 py-2 text-right font-semibold">Tỉ lệ đúng</th>
+                      <th className="px-2 py-2 text-right font-semibold">Độ phân biệt</th>
+                      <th className="px-2 py-2 font-semibold">Sai nhiều nhất</th>
+                      <th className="px-5 py-2 font-semibold">Nhận xét</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {data.students.map((s) => (
-                      <tr key={s.studentId} className="border-t border-border">
-                        <td className="px-5 py-2.5 text-ink">{s.name}</td>
-                        <td className="px-2 py-2.5">
-                          <span className={badge(progress[s.status].tone)}>{progress[s.status].label}</span>
+                    {[...data.questions].sort(byDifficulty).map((q) => (
+                      <tr key={q.position} className="border-t border-border align-top">
+                        <td className="max-w-xs px-5 py-2.5 text-ink">
+                          <span className="font-semibold">Câu {q.position + 1}.</span> {q.prompt}
                         </td>
-                        <td className="px-5 py-2.5 text-right font-semibold text-ink">{s.score ?? '—'}</td>
+                        <td className="px-2 py-2.5 text-right font-semibold whitespace-nowrap text-ink">
+                          {q.correctRate === null ? '—' : `${q.correctRate}%`}
+                        </td>
+                        <td className="px-2 py-2.5 text-right whitespace-nowrap">
+                          {q.discrimination === null ? (
+                            <span className="text-ink-muted">chưa đủ dữ liệu</span>
+                          ) : (
+                            <span className="font-semibold text-ink">{q.discrimination.toFixed(2)}</span>
+                          )}
+                        </td>
+                        <td className="px-2 py-2.5 text-ink">
+                          {q.mostCommonWrongAnswer ? (
+                            <>
+                              {q.mostCommonWrongAnswer.answer}{' '}
+                              <span className="whitespace-nowrap text-ink-muted">
+                                ({q.mostCommonWrongAnswer.count} bài)
+                              </span>
+                            </>
+                          ) : (
+                            <span className="text-ink-muted">—</span>
+                          )}
+                        </td>
+                        <td className="px-5 py-2.5">
+                          <div className="flex flex-wrap gap-1.5">
+                            {q.tooHard && <span className={badge('danger')}>Quá khó</span>}
+                            {q.lowDiscrimination && <span className={badge('warning')}>Phân biệt kém</span>}
+                          </div>
+                        </td>
                       </tr>
                     ))}
                   </tbody>
                 </table>
-              )}
-            </section>
-          </div>
-        </>
-      )}
-    </QueryState>
+              </div>
+            </>
+          )
+        }
+      </QueryState>
+    </section>
   )
 }
 
