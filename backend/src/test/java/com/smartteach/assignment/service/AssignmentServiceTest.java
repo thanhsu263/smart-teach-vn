@@ -16,7 +16,7 @@ import com.smartteach.assignment.entity.RevealPolicy;
 import com.smartteach.assignment.mapper.AssignmentMapperImpl;
 import com.smartteach.assignment.repository.AssignmentRepository;
 import com.smartteach.classroom.entity.Classroom;
-import com.smartteach.classroom.repository.ClassroomRepository;
+import com.smartteach.classroom.service.ClassroomService;
 import com.smartteach.common.exception.ApiException;
 import com.smartteach.common.exception.ValidationFailedException;
 import com.smartteach.quiz.dto.OptionResponse;
@@ -52,7 +52,7 @@ class AssignmentServiceTest {
     AssignmentRepository assignmentRepository;
 
     @Mock
-    ClassroomRepository classroomRepository;
+    ClassroomService classroomService;
 
     @Mock
     QuizService quizService;
@@ -62,7 +62,7 @@ class AssignmentServiceTest {
 
     @BeforeEach
     void setUp() {
-        service = new AssignmentService(assignmentRepository, classroomRepository, quizService, snapshots,
+        service = new AssignmentService(assignmentRepository, classroomService, quizService, snapshots,
                 new AssignmentMapperImpl(), Clock.fixed(NOW, ZoneOffset.UTC));
     }
 
@@ -70,8 +70,8 @@ class AssignmentServiceTest {
     void createMakesADraftWithAPublicCode() {
         when(assignmentRepository.countByOwnerId(OWNER)).thenReturn(0L);
         when(assignmentRepository.existsByPublicCode(anyString())).thenReturn(false);
-        when(classroomRepository.findByIdAndOwnerId(CLASS_ID, OWNER)).thenReturn(Optional.of(classroom()));
-        when(classroomRepository.findById(CLASS_ID)).thenReturn(Optional.of(classroom()));
+        when(classroomService.findOwned(OWNER, CLASS_ID)).thenReturn(classroom());
+        when(classroomService.findName(CLASS_ID)).thenReturn(Optional.of("10A1"));
         when(assignmentRepository.save(any())).thenAnswer(call -> call.getArgument(0));
 
         AssignmentResponse response = service.create(OWNER, request(null, NOW.plus(Duration.ofDays(7))));
@@ -116,7 +116,7 @@ class AssignmentServiceTest {
         assertStatus(() -> service.update(OWNER, ASSIGNMENT_ID, request(null, pastDue)), HttpStatus.CONFLICT);
 
         assignment.setStatus(AssignmentStatus.PUBLISHED);
-        when(classroomRepository.findById(CLASS_ID)).thenReturn(Optional.of(classroom()));
+        when(classroomService.findName(CLASS_ID)).thenReturn(Optional.of("10A1"));
         AssignmentResponse response = service.update(OWNER, ASSIGNMENT_ID, request(null, pastDue));
         assertThat(response.dueAt()).isEqualTo(pastDue);
         assertThat(response.updatedAt()).isEqualTo(NOW);
@@ -140,7 +140,7 @@ class AssignmentServiceTest {
         Assignment assignment = draft();
         when(assignmentRepository.findByIdAndOwnerIdForUpdate(ASSIGNMENT_ID, OWNER)).thenReturn(Optional.of(assignment));
         when(quizService.get(OWNER, QUIZ_ID)).thenReturn(quiz(List.of(question())));
-        when(classroomRepository.findById(CLASS_ID)).thenReturn(Optional.of(classroom()));
+        when(classroomService.findName(CLASS_ID)).thenReturn(Optional.of("10A1"));
 
         AssignmentResponse response = service.publish(OWNER, ASSIGNMENT_ID);
 
@@ -176,7 +176,7 @@ class AssignmentServiceTest {
         assertStatus(() -> service.close(OWNER, ASSIGNMENT_ID), HttpStatus.CONFLICT);
 
         assignment.setStatus(AssignmentStatus.PUBLISHED);
-        when(classroomRepository.findById(CLASS_ID)).thenReturn(Optional.of(classroom()));
+        when(classroomService.findName(CLASS_ID)).thenReturn(Optional.of("10A1"));
         AssignmentResponse response = service.close(OWNER, ASSIGNMENT_ID);
         assertThat(response.status()).isEqualTo(AssignmentStatus.CLOSED);
         assertThat(response.closedAt()).isEqualTo(NOW);

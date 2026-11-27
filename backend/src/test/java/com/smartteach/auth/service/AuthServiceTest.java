@@ -17,7 +17,7 @@ import com.smartteach.user.dto.UserResponse;
 import com.smartteach.user.entity.Role;
 import com.smartteach.user.entity.User;
 import com.smartteach.user.mapper.UserMapper;
-import com.smartteach.user.repository.UserRepository;
+import com.smartteach.user.service.UserService;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneOffset;
@@ -31,7 +31,7 @@ class AuthServiceTest {
 
     private static final Instant NOW = Instant.parse("2026-01-01T00:00:00Z");
 
-    private final UserRepository userRepository = mock(UserRepository.class);
+    private final UserService userService = mock(UserService.class);
     private final PasswordEncoder passwordEncoder = mock(PasswordEncoder.class);
     private final TokenService tokenService = mock(TokenService.class);
     private final RefreshTokenService refreshTokenService = mock(RefreshTokenService.class);
@@ -48,7 +48,7 @@ class AuthServiceTest {
             User u = inv.getArgument(0);
             return new UserResponse(u.getId(), u.getEmail(), u.getFullName(), u.getRole(), u.isEmailNotifications());
         });
-        service = new AuthService(userRepository, passwordEncoder, tokenService, refreshTokenService, userMapper,
+        service = new AuthService(userService, passwordEncoder, tokenService, refreshTokenService, userMapper,
                 Clock.fixed(NOW, ZoneOffset.UTC));
     }
 
@@ -62,17 +62,17 @@ class AuthServiceTest {
         assertThat(result.response().user().role()).isEqualTo(Role.TEACHER);
         assertThat(result.response().accessToken()).isEqualTo("access");
         assertThat(result.refreshToken().value()).isEqualTo("refresh");
-        verify(userRepository).saveAndFlush(org.mockito.ArgumentMatchers.argThat(
+        verify(userService).save(org.mockito.ArgumentMatchers.argThat(
                 u -> u.getPasswordHash().equals("bcrypt:Secret123!")));
     }
 
     @Test
     void registerWithTakenEmailIsConflict() {
-        when(userRepository.existsByEmail("taken@example.com")).thenReturn(true);
+        when(userService.existsByEmail("taken@example.com")).thenReturn(true);
 
         assertStatus(() -> service.register(new RegisterRequest("taken@example.com", "Secret123!", "A")),
                 HttpStatus.CONFLICT);
-        verify(userRepository, never()).saveAndFlush(any());
+        verify(userService, never()).save(any());
     }
 
     @Test
@@ -87,7 +87,7 @@ class AuthServiceTest {
     @Test
     void loginWithWrongPasswordIsUnauthorized() {
         User user = new User("t@example.com", "stored-hash", "T", Role.TEACHER, NOW);
-        when(userRepository.findByEmail("t@example.com")).thenReturn(Optional.of(user));
+        when(userService.findByEmail("t@example.com")).thenReturn(Optional.of(user));
         when(passwordEncoder.matches("wrong", "stored-hash")).thenReturn(false);
 
         assertStatus(() -> service.login(new LoginRequest("t@example.com", "wrong")), HttpStatus.UNAUTHORIZED);
@@ -96,7 +96,7 @@ class AuthServiceTest {
 
     @Test
     void loginWithUnknownEmailStillChecksAPasswordHash() {
-        when(userRepository.findByEmail(any())).thenReturn(Optional.empty());
+        when(userService.findByEmail(any())).thenReturn(Optional.empty());
         when(passwordEncoder.matches(anyString(), anyString())).thenReturn(true);
 
         assertStatus(() -> service.login(new LoginRequest("nobody@example.com", "x")), HttpStatus.UNAUTHORIZED);
@@ -107,7 +107,7 @@ class AuthServiceTest {
     @Test
     void loginWithCorrectPasswordIssuesTokens() {
         User user = new User("t@example.com", "stored-hash", "T", Role.TEACHER, NOW);
-        when(userRepository.findByEmail("t@example.com")).thenReturn(Optional.of(user));
+        when(userService.findByEmail("t@example.com")).thenReturn(Optional.of(user));
         when(passwordEncoder.matches("Secret123!", "stored-hash")).thenReturn(true);
 
         AuthService.AuthResult result = service.login(new LoginRequest("T@example.com", "Secret123!"));

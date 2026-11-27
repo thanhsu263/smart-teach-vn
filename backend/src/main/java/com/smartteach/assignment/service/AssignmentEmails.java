@@ -3,12 +3,11 @@ package com.smartteach.assignment.service;
 import com.smartteach.assignment.dto.AnalyticsResponse;
 import com.smartteach.assignment.dto.QuestionStatsResponse.QuestionStat;
 import com.smartteach.assignment.entity.Assignment;
-import com.smartteach.classroom.entity.Classroom;
-import com.smartteach.classroom.repository.ClassroomRepository;
+import com.smartteach.classroom.service.ClassroomService;
 import com.smartteach.common.mail.MailProperties;
 import com.smartteach.common.mail.MailQueue;
 import com.smartteach.user.entity.User;
-import com.smartteach.user.repository.UserRepository;
+import com.smartteach.user.service.UserService;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.Comparator;
@@ -35,8 +34,8 @@ class AssignmentEmails {
             Tắt tại: %s/account
             """;
 
-    private final UserRepository userRepository;
-    private final ClassroomRepository classroomRepository;
+    private final UserService userService;
+    private final ClassroomService classroomService;
     private final AnalyticsService analyticsService;
     private final QuestionStatsService questionStatsService;
     private final MailQueue mailQueue;
@@ -108,7 +107,7 @@ class AssignmentEmails {
     }
 
     private Optional<User> optedInOwner(Assignment assignment) {
-        return userRepository.findById(assignment.getOwnerId()).filter(User::isEmailNotifications);
+        return userService.findById(assignment.getOwnerId()).filter(User::isEmailNotifications);
     }
 
     /** Lowest correct rate among questions that someone answered. */
@@ -119,7 +118,7 @@ class AssignmentEmails {
     }
 
     private String className(Assignment assignment) {
-        return classroomRepository.findById(assignment.getClassId()).map(Classroom::getName).orElse("");
+        return classroomService.findName(assignment.getClassId()).orElse("");
     }
 
     private String link(Assignment assignment) {

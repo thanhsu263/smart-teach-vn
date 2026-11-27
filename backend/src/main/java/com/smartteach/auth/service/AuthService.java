@@ -9,7 +9,7 @@ import com.smartteach.common.exception.ApiException;
 import com.smartteach.user.entity.Role;
 import com.smartteach.user.entity.User;
 import com.smartteach.user.mapper.UserMapper;
-import com.smartteach.user.repository.UserRepository;
+import com.smartteach.user.service.UserService;
 import java.nio.charset.StandardCharsets;
 import java.time.Clock;
 import java.util.Locale;
@@ -25,7 +25,7 @@ public class AuthService {
     /** BCrypt only looks at the first 72 bytes; longer input is rejected instead of silently cut. */
     static final int MAX_PASSWORD_BYTES = 72;
 
-    private final UserRepository userRepository;
+    private final UserService userService;
     private final PasswordEncoder passwordEncoder;
     private final TokenService tokenService;
     private final RefreshTokenService refreshTokenService;
@@ -34,9 +34,9 @@ public class AuthService {
     /** Compared against when the email is unknown, so both cases take the same time. */
     private final String dummyHash;
 
-    public AuthService(UserRepository userRepository, PasswordEncoder passwordEncoder, TokenService tokenService,
+    public AuthService(UserService userService, PasswordEncoder passwordEncoder, TokenService tokenService,
                        RefreshTokenService refreshTokenService, UserMapper userMapper, Clock clock) {
-        this.userRepository = userRepository;
+        this.userService = userService;
         this.passwordEncoder = passwordEncoder;
         this.tokenService = tokenService;
         this.refreshTokenService = refreshTokenService;
@@ -56,13 +56,13 @@ public class AuthService {
             throw ApiException.badRequest("Password must be at most " + MAX_PASSWORD_BYTES + " bytes");
         }
         String email = normalizeEmail(request.email());
-        if (userRepository.existsByEmail(email)) {
+        if (userService.existsByEmail(email)) {
             throw ApiException.conflict("Email is already registered");
         }
         User user = new User(email, passwordEncoder.encode(request.password()),
                 request.fullName().trim(), Role.TEACHER, clock.instant());
         try {
-            userRepository.saveAndFlush(user);
+            userService.save(user);
         } catch (DataIntegrityViolationException e) {
             // Two sign-ups with the same email at the same time: the unique index decides.
             throw ApiException.conflict("Email is already registered");
@@ -72,7 +72,7 @@ public class AuthService {
 
     @Transactional
     public AuthResult login(LoginRequest request) {
-        Optional<User> user = userRepository.findByEmail(normalizeEmail(request.email()));
+        Optional<User> user = userService.findByEmail(normalizeEmail(request.email()));
         boolean valid = !tooLong(request.password())
                 && passwordEncoder.matches(request.password(), user.map(User::getPasswordHash).orElse(dummyHash))
                 && user.isPresent();

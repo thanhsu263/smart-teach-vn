@@ -10,7 +10,7 @@ import com.smartteach.assignment.repository.AttemptAnswerRepository;
 import com.smartteach.assignment.repository.AttemptRepository;
 import com.smartteach.assignment.repository.PositionStats;
 import com.smartteach.classroom.entity.Student;
-import com.smartteach.classroom.repository.StudentRepository;
+import com.smartteach.classroom.service.StudentService;
 import com.smartteach.quiz.dto.QuestionResponse;
 import java.util.ArrayList;
 import java.util.List;
@@ -36,12 +36,12 @@ public class AnalyticsService {
     private final AssignmentService assignmentService;
     private final AttemptRepository attemptRepository;
     private final AttemptAnswerRepository answerRepository;
-    private final StudentRepository studentRepository;
+    private final StudentService studentService;
     private final QuizSnapshots snapshots;
 
     public AnalyticsResponse analytics(Long ownerId, Long assignmentId) {
         Assignment assignment = assignmentService.findOwned(ownerId, assignmentId);
-        List<Student> students = studentRepository.findByClassroomIdOrderByPositionAscIdAsc(assignment.getClassId());
+        List<Student> students = studentService.listOfClass(assignment.getClassId());
         // At most one non-invalidated attempt per student (see AttemptService.start).
         Map<Long, Attempt> attempts = attemptRepository
                 .findByAssignmentIdAndStatusNot(assignmentId, AttemptStatus.INVALIDATED).stream()
