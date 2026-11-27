@@ -19,6 +19,8 @@ public interface AttemptRepository extends JpaRepository<Attempt, Long> {
 
     List<Attempt> findByAssignmentIdAndStatusNot(Long assignmentId, AttemptStatus status);
 
+    long countByAssignmentIdAndStatus(Long assignmentId, AttemptStatus status);
+
     /** Answers go with them (ON DELETE CASCADE). */
     @Modifying
     @Query(value = "DELETE FROM attempts WHERE started_at < :cutoff", nativeQuery = true)

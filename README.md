@@ -6,8 +6,9 @@
 SmartTeach helps Vietnamese high-school teachers manage classes, build quizzes and give them
 to a class as assignments. Students do not need an account: each one gets a personal access
 code, opens the link the teacher shares, answers (autosaved) and gets graded on the server.
-The teacher sees the average score, the correct rate of every question and who has not
-started yet. In class, the teacher can also run a quiz as a **live game**: students join with a
+The teacher sees the average score, who has not started yet and an item analysis of every
+question: how hard it was, whether it separated strong from weak students, and the wrong
+answer chosen most often. In class, the teacher can also run a quiz as a **live game**: students join with a
 6-digit PIN and a nickname, and answers and rankings update on every screen in real time.
 
 It is a portfolio project for a Java backend internship: a Spring Boot REST API with JWT
@@ -87,6 +88,9 @@ Lighthouse (production build, simulated mobile throttling, median of 3 runs):
 - **Assignments:** publish freezes a snapshot of the quiz, students take it with their code,
   answers autosave, grading happens on the server, results are revealed immediately or after
   closing, per-question analytics.
+- **Item analysis:** per question the correct rate (difficulty), the discrimination index (top
+  27% vs bottom 27%, native SQL with window functions) and the most chosen wrong answer; the UI
+  flags questions that are too hard or do not separate students.
 - **Live quiz:** the teacher projects a game, students join from their phones with a PIN and a
   nickname, points depend on correctness and speed; state is pushed over WebSocket (STOMP).
 - **Data retention:** a nightly job deletes student attempts older than 90 days.
@@ -370,6 +374,7 @@ status goes `draft` → `published` → `closed`.
 | `POST /api/assignments/{id}/publish` | Freeze the quiz into a snapshot and open the assignment |
 | `POST /api/assignments/{id}/close` | Close early; students can no longer save or submit |
 | `GET /api/assignments/{id}/analytics` | Average score, correct rate per question, every student's status |
+| `GET /api/assignments/{id}/question-stats` | Item analysis per question, see [Item analysis](#item-analysis) |
 
 Students use the public endpoints, without an account:
 
@@ -407,6 +412,38 @@ Design notes:
   `dueAt` or after closing returns **409**.
 - **Retention.** `AttemptRetentionJob` runs every night at 03:00 UTC and deletes attempts (and
   their answers) started more than 90 days ago. The cron can be changed with `app.retention.cron`.
+
+### Item analysis
+
+`GET /api/assignments/{id}/question-stats` checks the quiz itself, the way teachers analyse a
+test, using submitted attempts only:
+
+| Field | Meaning |
+|---|---|
+| `correctRate` | Share of attempts that got the question right (difficulty); an empty answer counts as wrong |
+| `discrimination` | (right in the top group − right in the bottom group) / group size, from −1 to 1. The groups are the 27% best and the 27% worst attempts by score. Near 1: strong students get it, weak ones do not. Near 0 or negative: the question does not measure what the test measures (often an unclear prompt or a wrong answer key) |
+| `mostCommonWrongAnswer` | The wrong answer chosen most often and how many times: option labels, or the text typed |
+| `tooHard` / `lowDiscrimination` | `correctRate` below 30% / `discrimination` below 0.2 (a common rule of thumb) |
+
+With fewer than 10 submitted attempts a group would hold one or two students, so
+`discrimination` is `null` and the UI shows "chưa đủ dữ liệu". The page lists the questions
+from hardest to easiest and badges the flagged ones.
+
+How it is computed
+([`QuestionStatsService`](backend/src/main/java/com/smartteach/assignment/service/QuestionStatsService.java)),
+four queries whatever the class size:
+
+- The groups are one native query in
+  [`AttemptAnswerRepository`](backend/src/main/java/com/smartteach/assignment/repository/AttemptAnswerRepository.java).
+  A CTE numbers the submitted attempts with `ROW_NUMBER() OVER (ORDER BY score DESC, id)` and
+  `COUNT(*) OVER ()`; the outer query joins the answers and counts per question with
+  `COUNT(*) FILTER (WHERE …)` for all, `rank <= k` and `rank > total − k`. Ranking with
+  `ROW_NUMBER` (ties broken by attempt id) keeps both groups exactly `k = round(0.27 × n)` big.
+  `NTILE` cannot cut at 27%, and `PERCENT_RANK` puts equal scores in the same group, so with a
+  class of 30 and scores in steps of 10 the groups would have different sizes.
+- The most chosen wrong answer is counted in Java, because equal answers can be stored
+  differently: `[2,0]` and `[0,2]` are the same multi choice, and "Bạch Mã" and " bach  ma" the
+  same text once normalised like the grader does.
 
 ## Live quiz
 
@@ -560,7 +597,10 @@ paths, the 3-query read and deleting a quiz that an assignment still points to.
 Assignment tests cover grading for every kind (unit tests), the publish and schedule rules
 (Mockito), and over HTTP the full flow publish → start → autosave → submit → analytics, hidden
 answers before submitting, both reveal policies, 404 for wrong codes and tokens, invalidation
-after a new access code, and the 90-day retention job. A demo-data test checks that the seed
+after a new access code, and the 90-day retention job. The item analysis is checked on a
+dataset of 11 attempts computed by hand (difficulty, discrimination with ties at the group
+boundary, grouping of `[2,1]`/`[1,2]` and of differently typed texts, attempts in progress left
+out), plus the under-10 case, a draft and another teacher (404). A demo-data test checks that the seed
 builds the expected classes, quizzes and results and can run twice.
 Live quiz tests cover the room rules as unit tests (scoring, nickname rules, limits, auto-reveal,
 stale timers, late and duplicate answers, ties, expiry) and, with the server on a random port,

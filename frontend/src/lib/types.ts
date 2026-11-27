@@ -156,6 +156,24 @@ export interface Analytics {
   }[]
 }
 
+/** Item analysis; discrimination is null while fewer than minSubmissions attempts are submitted. */
+export interface QuestionStats {
+  submittedCount: number
+  minSubmissions: number
+  groupSize: number
+  questions: {
+    position: number
+    kind: QuestionKind
+    prompt: string
+    correct: number
+    correctRate: number | null
+    discrimination: number | null
+    mostCommonWrongAnswer: { answer: string; count: number } | null
+    tooHard: boolean
+    lowDiscrimination: boolean
+  }[]
+}
+
 /** single/true_false: option index; multi: list of indexes; short_text: text. */
 export type AnswerValue = number | number[] | string
 
