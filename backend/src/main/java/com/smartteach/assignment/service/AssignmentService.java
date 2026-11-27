@@ -9,7 +9,6 @@ import com.smartteach.assignment.entity.AssignmentStatus;
 import com.smartteach.assignment.mapper.AssignmentMapper;
 import com.smartteach.assignment.repository.AssignmentRepository;
 import com.smartteach.classroom.entity.Classroom;
-import com.smartteach.classroom.repository.ClassroomRepository;
 import com.smartteach.classroom.service.ClassroomService;
 import com.smartteach.common.dto.PageResponse;
 import com.smartteach.common.exception.ApiException;
@@ -45,7 +44,7 @@ public class AssignmentService {
     private static final Sort NEWEST_FIRST = Sort.by(Sort.Order.desc("createdAt"), Sort.Order.desc("id"));
 
     private final AssignmentRepository assignmentRepository;
-    private final ClassroomRepository classroomRepository;
+    private final ClassroomService classroomService;
     private final QuizService quizService;
     private final QuizSnapshots snapshots;
     private final AssignmentMapper mapper;
@@ -166,7 +165,7 @@ public class AssignmentService {
     }
 
     private Classroom findClass(Long ownerId, Long classId) {
-        return classroomRepository.findByIdAndOwnerId(classId, ownerId).orElseThrow(ClassroomService::classNotFound);
+        return classroomService.findOwned(ownerId, classId);
     }
 
     private void apply(Long ownerId, Assignment assignment, AssignmentRequest request) {
@@ -212,7 +211,7 @@ public class AssignmentService {
     }
 
     private AssignmentResponse toResponse(Assignment assignment) {
-        String className = classroomRepository.findById(assignment.getClassId()).map(Classroom::getName).orElse(null);
+        String className = classroomService.findName(assignment.getClassId()).orElse(null);
         Integer questionCount = assignment.getQuizSnapshot() == null ? null
                 : snapshots.read(assignment.getQuizSnapshot()).questions().size();
         return mapper.toResponse(assignment, className, questionCount);

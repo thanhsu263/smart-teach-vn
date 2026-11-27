@@ -46,6 +46,10 @@ server:
   # Behind Render's proxy: take the client IP from X-Forwarded-For (rate limits are per IP).
   # Tomcat only trusts that header when it comes from a private-network address.
   forward-headers-strategy: native
+  tomcat:
+    # Queue for new connections while Tomcat is busy. With the default of 100, a class of 200
+    # pressing "Submit" together got "connection refused" (see loadtest/README.md).
+    accept-count: 1000
 
 management:
   endpoints:

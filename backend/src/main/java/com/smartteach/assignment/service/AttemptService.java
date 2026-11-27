@@ -17,8 +17,8 @@ import com.smartteach.assignment.repository.AssignmentRepository;
 import com.smartteach.assignment.repository.AttemptAnswerRepository;
 import com.smartteach.assignment.repository.AttemptRepository;
 import com.smartteach.classroom.entity.Student;
-import com.smartteach.classroom.repository.StudentRepository;
 import com.smartteach.classroom.service.AccessCodes;
+import com.smartteach.classroom.service.StudentService;
 import com.smartteach.common.exception.ApiException;
 import com.smartteach.common.security.Hashing;
 import com.smartteach.quiz.dto.OptionResponse;
@@ -57,7 +57,7 @@ public class AttemptService {
     private final AssignmentRepository assignmentRepository;
     private final AttemptRepository attemptRepository;
     private final AttemptAnswerRepository answerRepository;
-    private final StudentRepository studentRepository;
+    private final StudentService studentService;
     private final QuizSnapshots snapshots;
     private final Clock clock;
     private final MeterRegistry meterRegistry;
@@ -71,8 +71,7 @@ public class AttemptService {
         Assignment assignment = assignmentRepository.findByPublicCode(AccessCodes.normalize(publicCode))
                 .filter(a -> a.getStatus() != AssignmentStatus.DRAFT)
                 .orElseThrow(AttemptService::invalidCodes);
-        Student student = studentRepository
-                .findFirstByAccessCodeHashAndClassroomId(AccessCodes.hash(accessCode), assignment.getClassId())
+        Student student = studentService.findByAccessCode(assignment.getClassId(), accessCode)
                 .orElseThrow(AttemptService::invalidCodes);
 
         Instant now = clock.instant();
@@ -211,7 +210,7 @@ public class AttemptService {
     }
 
     private String studentName(Attempt attempt) {
-        return studentRepository.findById(attempt.getStudentId()).map(Student::getName).orElse("");
+        return studentService.findName(attempt.getStudentId()).orElse("");
     }
 
     private static void checkCanAnswer(Attempt attempt, Assignment assignment, Instant now) {

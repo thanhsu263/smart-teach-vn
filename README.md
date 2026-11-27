@@ -2,6 +2,7 @@
 
 [![CI](https://github.com/thanhsu263/smart-teach-vn/actions/workflows/ci.yml/badge.svg)](https://github.com/thanhsu263/smart-teach-vn/actions/workflows/ci.yml)
 [![Coverage](https://raw.githubusercontent.com/thanhsu263/smart-teach-vn/badges/jacoco.svg)](https://github.com/thanhsu263/smart-teach-vn/actions/workflows/ci.yml)
+[![CodeQL](https://github.com/thanhsu263/smart-teach-vn/actions/workflows/codeql.yml/badge.svg)](https://github.com/thanhsu263/smart-teach-vn/actions/workflows/codeql.yml)
 
 SmartTeach helps Vietnamese high-school teachers manage classes, build quizzes and give them
 to a class as assignments. Students do not need an account: each one gets a personal access
@@ -106,10 +107,12 @@ Lighthouse (production build, simulated mobile throttling, median of 3 runs):
 - **Backend:** Java 26, Spring Boot 4.1 (Web MVC, Security, OAuth2 Resource Server for JWT,
   Data JPA, Validation, Actuator, WebSocket + STOMP), Flyway, MapStruct, Lombok, springdoc-openapi
 - **Database:** PostgreSQL 18 (Neon in production)
-- **Tests:** JUnit 5, Mockito, Testcontainers (real PostgreSQL), JaCoCo
+- **Tests:** JUnit 5, Mockito, Testcontainers (real PostgreSQL), JaCoCo, ArchUnit, Gatling
+  (load tests)
 - **Frontend:** React + Vite + TypeScript, React Router, TanStack Query, Tailwind CSS,
   react-hook-form + zod, axios, @stomp/stompjs
-- **CI / deploy:** GitHub Actions, Docker, Render (backend), Vercel (frontend)
+- **CI / deploy:** GitHub Actions (build, Checkstyle, CodeQL, Dependabot), Docker, Render
+  (backend), Vercel (frontend)
 
 ## Architecture
 
@@ -680,3 +683,88 @@ after 5 tries, no mail after a rollback, and that the jobs ran under a ShedLock 
 
 The JaCoCo report is written to `backend/target/site/jacoco/index.html`. `mvn verify` fails if
 line coverage of any `service` package drops below 70%.
+
+Architecture rules are checked by ArchUnit (`ArchitectureTest`): controllers do not use
+repositories, a feature module never touches another module's repositories or controllers (it
+calls that module's service), `common` depends on no feature module, and modules have no
+dependency cycles. Checkstyle (a short
+rule set in `backend/config/checkstyle.xml`) runs in the `validate` phase of every build.
+CodeQL scans the Java, TypeScript and workflow code on every pull request, and Dependabot
+opens weekly update PRs for Maven, npm and GitHub Actions.
+
+## Performance
+
+Measured on 2026-11-27 on a laptop: Intel Core i9-14900HX (24 cores / 32 threads), 32 GB RAM,
+Windows 11, JDK 26.0.2.1, PostgreSQL 18.7 in Docker Desktop. The backend ran as one instance
+with default JVM settings and Hikari's default pool of 10 connections. These are local numbers
+without network latency, so they show where the code stands, not what the free hosting plan
+gives.
+
+### SQL statements per request (N+1 check)
+
+`QueryCountIntegrationTest` counts the SQL statements of each list and analytics endpoint
+(Hibernate statistics) with 10 and with 20 rows of data, and fails if the count grows with the
+data:
+
+| Endpoint | Statements (10 rows) | Statements (20 rows) |
+|---|---|---|
+| `GET /api/classes` | 1 | 1 |
+| `GET /api/classes/{id}/students` | 2 | 2 |
+| `GET /api/quizzes` | 1 | 1 |
+| `GET /api/assignments?classId=` | 2 | 2 |
+| `GET /api/assignments/{id}/analytics` | 4 | 4 |
+| `GET /api/assignments/{id}/question-stats` | 4 | 4 |
+
+Lists are DTO projections in one query (Spring skips the count query when the page is not
+full); the second statement is the ownership check of the class or assignment.
+
+### Analytics queries (`EXPLAIN ANALYZE`)
+
+[docs/perf/analytics-seed.sql](docs/perf/analytics-seed.sql) fills an empty database with
+100 teachers, 40,000 students, 5,000 assignments, 200,000 attempts and 2,000,000 answers.
+[docs/perf/analytics-explain.sql](docs/perf/analytics-explain.sql) runs `EXPLAIN (ANALYZE,
+BUFFERS)` on the five queries behind the analytics and item-analysis endpoints for one
+assignment of 40 students. Execution time, warm cache:
+
+| Query | Without an index on `attempts.assignment_id` | With it (V1 migration) |
+|---|---|---|
+| Attempts of the assignment | 7.6 ms | 0.055 ms |
+| Answers per question | 5.7 ms | 0.19 ms |
+| Submitted count | 5.4 ms | 0.061 ms |
+| Best / worst 27% (window function) | 5.8 ms | 0.23 ms |
+| Wrong answers | 5.9 ms | 0.17 ms |
+
+Without the foreign-key index every query is a parallel sequential scan of all 200,000
+attempts and grows with the table; with it, each is an index scan plus a nested loop over the
+unique `(attempt_id, position)` index of the answers. A composite index on
+`(assignment_id, status) INCLUDE (score)` saved at most 0.03 ms, so it was not added.
+
+### Load tests (Gatling)
+
+The simulations and how to run them are in [loadtest/README.md](loadtest/README.md).
+
+**200 students submit at the same moment** (save the last answer + submit, 400 requests;
+8 runs, each on a freshly started backend):
+
+| | Before | After `server.tomcat.accept-count: 1000` |
+|---|---|---|
+| Runs with failed requests | 5 of 8 (up to 9.75% of requests) | 0 of 8 |
+| p95 (median of the runs) | 334 ms | 313 ms |
+| p99 (median of the runs) | 476 ms | 450 ms |
+
+The failures were `Connection refused`: 200 new connections in the same millisecond overflowed
+Tomcat's default queue of 100 waiting connections while the JVM was still warming up. A pool
+of 30 database connections instead of 10 did not change the response times, so the pool was
+left at its default.
+
+**Live quiz: 1 teacher, 50 players, 10 questions** (3 runs, 0 failed requests):
+
+| | p50 | p95 | p99 |
+|---|---|---|---|
+| Player answers (`POST /answers`, 500 per run) | 6–9 ms | 57–83 ms | 76–95 ms |
+| Player joins | 4–5 ms | 10–11 ms | 13–22 ms |
+| Teacher opens a question (`POST /next`) | 4–5 ms | 48–56 ms | 48–56 ms |
+| Push delay: state sent → received by a player | 4–5 ms | 34–47 ms | 48–98 ms |
+
+Every answer is broadcast to all 50 players (2,500 messages per question). Each player got all
+10 questions, and the room revealed the answer by itself as soon as the 50th player answered.

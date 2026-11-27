@@ -20,7 +20,7 @@ import com.smartteach.quiz.entity.QuestionKind;
 import com.smartteach.quiz.service.QuizService;
 import com.smartteach.user.entity.Role;
 import com.smartteach.user.entity.User;
-import com.smartteach.user.repository.UserRepository;
+import com.smartteach.user.service.UserService;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
@@ -54,7 +54,7 @@ public class DemoData {
             "Trịnh Hải Nam", "Mai Anh Thư", "Phan Đức Tài", "Hồ Ngọc Trâm", "Châu Gia Bảo",
             "Tạ Minh Khoa", "La Thảo Vy", "Quách Nhật Long");
 
-    private final UserRepository userRepository;
+    private final UserService userService;
     private final PasswordEncoder passwordEncoder;
     private final ClassroomService classroomService;
     private final StudentService studentService;
@@ -107,10 +107,10 @@ public class DemoData {
 
     private Long resetTeacher(String email, String password) {
         String normalized = email.trim().toLowerCase(Locale.ROOT);
-        User teacher = userRepository.findByEmail(normalized)
+        User teacher = userService.findByEmail(normalized)
                 .orElseGet(() -> new User(normalized, "", "Nguyễn Minh Anh", Role.TEACHER, clock.instant()));
         teacher.setPasswordHash(passwordEncoder.encode(password));
-        Long teacherId = userRepository.save(teacher).getId();
+        Long teacherId = userService.save(teacher).getId();
 
         // Deleting a class also deletes its students, assignments and attempts.
         PageRequest all = PageRequest.of(0, 100);

@@ -9,6 +9,7 @@ import com.smartteach.classroom.repository.StudentRepository;
 import com.smartteach.common.dto.PageResponse;
 import com.smartteach.common.exception.ApiException;
 import java.time.Clock;
+import java.util.Optional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -69,9 +70,15 @@ public class ClassroomService {
         classroomRepository.delete(findOwned(ownerId, classId));
     }
 
-    Classroom findOwned(Long ownerId, Long classId) {
+    /** Also used by other modules (e.g. assignments) to check that a class belongs to the teacher. */
+    public Classroom findOwned(Long ownerId, Long classId) {
         return classroomRepository.findByIdAndOwnerId(classId, ownerId)
                 .orElseThrow(ClassroomService::classNotFound);
+    }
+
+    /** No owner check: for callers that already checked the record that points to this class. */
+    public Optional<String> findName(Long classId) {
+        return classroomRepository.findById(classId).map(Classroom::getName);
     }
 
     public static ApiException classNotFound() {

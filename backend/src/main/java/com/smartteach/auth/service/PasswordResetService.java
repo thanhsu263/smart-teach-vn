@@ -8,7 +8,7 @@ import com.smartteach.common.mail.MailQueue;
 import com.smartteach.common.mail.MailProperties;
 import com.smartteach.common.security.Hashing;
 import com.smartteach.user.entity.User;
-import com.smartteach.user.repository.UserRepository;
+import com.smartteach.user.service.UserService;
 import java.nio.charset.StandardCharsets;
 import java.security.SecureRandom;
 import java.time.Clock;
@@ -34,7 +34,7 @@ public class PasswordResetService {
     static final Duration TOKEN_TTL = Duration.ofMinutes(30);
     private static final SecureRandom RANDOM = new SecureRandom();
 
-    private final UserRepository userRepository;
+    private final UserService userService;
     private final PasswordResetTokenRepository tokenRepository;
     private final RefreshTokenRepository refreshTokenRepository;
     private final PasswordEncoder passwordEncoder;
@@ -44,7 +44,7 @@ public class PasswordResetService {
 
     /** Unknown emails are silently ignored. */
     public void requestReset(String email) {
-        userRepository.findByEmail(email.trim().toLowerCase(Locale.ROOT)).ifPresent(this::sendLink);
+        userService.findByEmail(email.trim().toLowerCase(Locale.ROOT)).ifPresent(this::sendLink);
     }
 
     /** Sets the new password and signs the user out everywhere (all refresh tokens revoked). */
@@ -64,7 +64,7 @@ public class PasswordResetService {
         tokenRepository.invalidateAllForUser(user.getId(), now);
         refreshTokenRepository.revokeAllForUser(user.getId(), now);
         user.setPasswordHash(passwordEncoder.encode(newPassword));
-        userRepository.save(user);
+        userService.save(user);
     }
 
     private void sendLink(User user) {

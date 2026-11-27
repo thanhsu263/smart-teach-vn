@@ -14,6 +14,7 @@ import java.time.Clock;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -35,6 +36,20 @@ public class StudentService {
         return studentRepository.findByClassroomIdOrderByPositionAscIdAsc(classId).stream()
                 .map(mapper::toResponse)
                 .toList();
+    }
+
+    /** All students of a class, in list order. No owner check: the caller already checked the class. */
+    public List<Student> listOfClass(Long classId) {
+        return studentRepository.findByClassroomIdOrderByPositionAscIdAsc(classId);
+    }
+
+    /** The student of this class who has this access code; codes only work in their own class. */
+    public Optional<Student> findByAccessCode(Long classId, String accessCode) {
+        return studentRepository.findFirstByAccessCodeHashAndClassroomId(AccessCodes.hash(accessCode), classId);
+    }
+
+    public Optional<String> findName(Long studentId) {
+        return studentRepository.findById(studentId).map(Student::getName);
     }
 
     /**
