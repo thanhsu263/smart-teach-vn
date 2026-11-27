@@ -17,6 +17,8 @@ export interface AuthState {
   login: (input: LoginInput) => Promise<void>
   register: (input: RegisterInput) => Promise<void>
   logout: () => Promise<void>
+  /** After the user changed their own account, e.g. settings. */
+  updateUser: (user: User) => void
 }
 
 export const AuthContext = createContext<AuthState | null>(null)

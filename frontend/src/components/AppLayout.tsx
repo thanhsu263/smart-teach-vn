@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react'
-import { NavLink, Outlet, useLocation } from 'react-router'
+import { Link, NavLink, Outlet, useLocation } from 'react-router'
 import { useAuth } from '../auth/auth-context'
 import { Logo } from './form'
 import { Icon, type IconName } from './Icon'
@@ -81,16 +81,23 @@ export function AppLayout() {
           </button>
           <Logo className="md:hidden" />
           <div className="ml-auto flex items-center gap-3">
-            <span className="hidden text-right text-sm leading-tight sm:block">
-              <span className="block font-semibold text-ink">{user?.fullName}</span>
-              <span className="text-ink-muted">{admin ? 'Quản trị viên' : 'Giáo viên'}</span>
-            </span>
-            <span
-              aria-hidden="true"
-              className="grid size-10 place-items-center rounded-full bg-primary-tint font-semibold text-primary-deep"
+            <Link
+              to="/account"
+              title="Tài khoản"
+              className="flex items-center gap-3 rounded-sm p-1 hover:bg-primary-tint"
             >
-              {initials(user?.fullName)}
-            </span>
+              <span className="hidden text-right text-sm leading-tight sm:block">
+                <span className="block font-semibold text-ink">{user?.fullName}</span>
+                <span className="text-ink-muted">{admin ? 'Quản trị viên' : 'Giáo viên'}</span>
+              </span>
+              <span
+                aria-hidden="true"
+                className="grid size-10 place-items-center rounded-full bg-primary-tint font-semibold text-primary-deep"
+              >
+                {initials(user?.fullName)}
+              </span>
+              <span className="sr-only sm:hidden">Tài khoản</span>
+            </Link>
             <button
               type="button"
               onClick={() => void logout()}
