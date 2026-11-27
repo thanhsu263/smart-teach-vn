@@ -3,8 +3,18 @@ spring:
     # Local: Mailpit from docker-compose (inbox at http://localhost:8025). Not used when BREVO_API_KEY is set.
     host: ${MAIL_HOST:localhost}
     port: ${MAIL_PORT:1025}
+    properties:
+      # Milliseconds. Mails are sent on a scheduler thread, which must not hang on a dead server.
+      mail.smtp.connectiontimeout: 5000
+      mail.smtp.timeout: 10000
+      mail.smtp.writetimeout: 10000
   application:
     name: smartteach
+  task:
+    scheduling:
+      pool:
+        # The outbox sender waits on the mail provider; other jobs keep running meanwhile.
+        size: 2
   config:
     # Local dev: read the repo-root .env (works from backend/ or the repo root).
     # In Docker / cloud the same keys come from real environment variables.
@@ -68,6 +78,13 @@ app:
     brevo-api-key: ${BREVO_API_KEY:}
     # Frontend address used in email links (password reset).
     link-base-url: ${APP_FRONTEND_URL:http://localhost:5173}
+    # How often the outbox job looks for work. It reads the database only when a mail was queued.
+    outbox-delay: 10s
+  jobs:
+    # Auto-submit attempts of ended assignments, queue summaries and 24h reminders.
+    # Also shortly after startup, since a sleeping free-plan server misses scheduled times.
+    deadline-initial-delay: 2m
+    deadline-interval: 1h
   metrics:
     # Password for the "prometheus" user on /actuator/prometheus; blank = endpoint closed.
     password: ${METRICS_PASSWORD:}

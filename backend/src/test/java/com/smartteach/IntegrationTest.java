@@ -4,12 +4,16 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.jayway.jsonpath.JsonPath;
+import com.smartteach.common.mail.EmailOutboxRepository;
+import com.smartteach.common.mail.OutboxSender;
+import com.smartteach.common.mail.OutboxStatus;
 import com.smartteach.user.entity.Role;
 import com.smartteach.user.entity.User;
 import com.smartteach.user.repository.UserRepository;
 import java.time.Instant;
 import java.util.UUID;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.domain.Limit;
 import org.springframework.boot.micrometer.metrics.test.autoconfigure.AutoConfigureMetrics;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
@@ -43,6 +47,20 @@ public abstract class IntegrationTest {
 
     @Autowired
     private PasswordEncoder passwordEncoder;
+
+    @Autowired
+    private OutboxSender outboxSender;
+
+    @Autowired
+    private EmailOutboxRepository outboxRepository;
+
+    /** What the outbox job does in the background (it is switched off in tests): send every due mail. */
+    protected void sendQueuedMails() {
+        do {
+            outboxSender.sendDue();
+        } while (!outboxRepository.findByStatusAndNextAttemptAtLessThanEqualOrderById(
+                OutboxStatus.PENDING, Instant.now(), Limit.of(1)).isEmpty());
+    }
 
     /** Registers a new teacher with a unique email and returns an {@code Authorization} header value. */
     protected String signUpTeacher() throws Exception {

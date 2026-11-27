@@ -7,6 +7,13 @@ app:
   # The suite registers many users from 127.0.0.1; RateLimitIntegrationTest switches it back on.
   rate-limit:
     enabled: false
+  mail:
+    # Tests send queued mails themselves (IntegrationTest.sendQueuedMails), never in the background.
+    outbox-delay: 1h
+  jobs:
+    # Never fires during a test run; tests call AssignmentDeadlineJob.run() directly.
+    deadline-initial-delay: 24h
+    deadline-interval: 24h
 
 spring:
   jpa:
